@@ -572,7 +572,6 @@ def config_parser():
     parser.add_argument("--use_viewdirs", type=str, default=True, help='use full 5D input instead of 3D')
 
     ### CONSOLE AND TENSORBOARD
-    # logging/saving options
     parser.add_argument("--i_print", type=int, default=100, help='frequency of console printout and metric loggin')
     parser.add_argument("--i_img", type=int, default=2000, help='frequency of tensorboard image logging')
     parser.add_argument("--i_weights", type=int, default=5000, help='frequency of weight ckpt saving')
