@@ -1,7 +1,7 @@
 ### INPUT
 datadir = ./data/tanks_and_temples
-scene = tat_training_Truck
-expname = tat_training_Truck
+scene = tat_intermediate_Playground
+expname = tat_intermediate_Playground
 basedir = ./logs
 config = None
 ckpt_path = None
