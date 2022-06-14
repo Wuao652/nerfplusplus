@@ -151,3 +151,5 @@ data/
 
 # logs
 logs/
+colmap_runner/carla_data/
+carla_visualizer/

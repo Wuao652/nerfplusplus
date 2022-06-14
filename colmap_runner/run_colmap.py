@@ -8,7 +8,8 @@ from normalize_cam_dict import normalize_cam_dict
 #########################################################################
 
 def bash_run(cmd):
-    colmap_bin = '/home/zhangka2/code/colmap/build/__install__/bin/colmap'
+    # colmap_bin = '/home/dennis/colmap/build/__install__/bin/colmap'
+    colmap_bin = 'colmap'
     cmd = colmap_bin + ' ' + cmd
     print('\nRunning cmd: ', cmd)
 
@@ -133,6 +134,16 @@ def main(img_dir, out_dir, run_mvs=False):
     # undistort images
     mvs_dir = os.path.join(out_dir, 'mvs')
     os.makedirs(mvs_dir, exist_ok=True)
+
+    # manually extracting the files from \output\sfm\sparse\0 to \output\sfm\sparse.
+    subprocess.run(["cp", "-a", "../data/carla_data/9scenes/sfm/sparse/0/cameras.bin",
+                    "../data/carla_data/9scenes/sfm/sparse/cameras.bin"])
+    subprocess.run(["cp", "-a", "../data/carla_data/9scenes/sfm/sparse/0/images.bin",
+                    "../data/carla_data/9scenes/sfm/sparse/images.bin"])
+    subprocess.run(["cp", "-a", "../data/carla_data/9scenes/sfm/sparse/0/points3D.bin",
+                    "../data/carla_data/9scenes/sfm/sparse/points3D.bin"])
+    subprocess.run(["cp", "-a", "../data/carla_data/9scenes/sfm/sparse/0/project.ini",
+                    "../data/carla_data/9scenes/sfm/sparse/project.ini"])
     prepare_mvs(img_dir, sparse_dir, mvs_dir)
 
     # extract camera parameters and undistorted images
@@ -161,8 +172,8 @@ def main(img_dir, out_dir, run_mvs=False):
 if __name__ == '__main__':
     ### note: this script is intended for the case where all images are taken by the same camera, i.e., intrinisics are shared.
     
-    img_dir = ''
-    out_dir = ''
+    img_dir = './carla_data/9scenes'
+    out_dir = '../data/carla_data/9scenes'
     run_mvs = False
     main(img_dir, out_dir, run_mvs=run_mvs)
 
