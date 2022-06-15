@@ -8,7 +8,8 @@ import os
 from collections import OrderedDict
 from ddp_model import NerfNetWithAutoExpo
 import time
-from data_loader_split import load_data_split
+# from data_loader_split import load_data_split
+from carla_loader_split import load_data_split
 import numpy as np
 from tensorboardX import SummaryWriter
 from utils import img2mse, mse2psnr, img_HWC2CHW, colorize, TINY_NUMBER
@@ -530,9 +531,13 @@ def config_parser():
     import configargparse
     parser = configargparse.ArgumentParser()
     ### INPUT
-    parser.add_argument("--datadir", type=str, default="./data/tanks_and_temples", help='input data directory')
-    parser.add_argument("--scene", type=str, default="tat_intermediate_Playground", help='scene name')
-    parser.add_argument("--expname", type=str, default="tat_intermediate_Playground", help='experiment name')
+    # parser.add_argument("--datadir", type=str, default="./data/tanks_and_temples", help='input data directory')
+    # parser.add_argument("--scene", type=str, default="tat_intermediate_Playground", help='scene name')
+    # parser.add_argument("--expname", type=str, default="tat_intermediate_Playground", help='experiment name')
+
+    parser.add_argument("--datadir", type=str, default="./data/custom_data", help='input data directory')
+    parser.add_argument("--scene", type=str, default="carla_all", help='scene name')
+    parser.add_argument("--expname", type=str, default="carla_all", help='experiment name')
     parser.add_argument("--basedir", type=str, default='./logs/', help='where to store ckpts and logs')
     parser.add_argument("--config", type=str, default=None, help='config file path')
     parser.add_argument("--ckpt_path", type=str, default=None,
@@ -542,7 +547,7 @@ def config_parser():
                         help='will load 1/N images from test/val sets, useful for large datasets like deepvoxels')
 
     ### TRAINING
-    parser.add_argument("--N_iters", type=int, default=500001, help='number of iterations')
+    parser.add_argument("--N_iters", type=int, default=250001, help='number of iterations')
     parser.add_argument("--N_rand", type=int, default=1024,
                         help='batch size (number of random rays per gradient step)')
     parser.add_argument("--lrate", type=float, default=5e-4, help='learning rate')
