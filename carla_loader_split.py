@@ -23,14 +23,15 @@ def load_data_split(basedir, scene, split, skip=1, try_load_min_depth=True, only
                                 [0.0, 224.06641222710715, 240.0, 0.0],
                                 [0.0, 0.0, 1.0, 0.0],
                                 [0.0, 0.0, 0.0, 1.0]], dtype=np.float32)
-    print(intrinsics_files)
+    # print(f"intrinsic matrix : ")
+    # print(intrinsics_files)
 
     # pose files
     pose_files = np.load(
         os.path.join(basedir, scene, 'poses.npy')
     )
-    print(f"raw pose_files: {pose_files.shape[0]}")
-    print(f"pose_files shape: {pose_files.shape}")
+    # print(f"load {pose_files.shape[0]} pose_files")
+    # print(f"pose_files shape : {pose_files.shape}")
     cam_cnt = pose_files.shape[0]
 
     # img files
@@ -38,8 +39,7 @@ def load_data_split(basedir, scene, split, skip=1, try_load_min_depth=True, only
         os.path.join(basedir, scene),
         exts=['*.png', '*.jpg'])
     if len(img_files) > 0:
-        print('raw img_files: {}'.format(len(img_files)))
-        print(img_files)
+        # print(f"load {len(img_files)} image files")
         img_files = img_files[::skip]
         assert (len(img_files) == cam_cnt)
     else:
@@ -54,7 +54,6 @@ def load_data_split(basedir, scene, split, skip=1, try_load_min_depth=True, only
     pose_files[:, :-1, -1] = pose_files[:, :-1, -1] - np.mean(xy, 0)
 
     scale_factor = 6.0
-    print('scale_facter: ', scale_factor)
     pose_files[:, :, -1] /= scale_factor
 
     t = np.tile(
@@ -67,7 +66,6 @@ def load_data_split(basedir, scene, split, skip=1, try_load_min_depth=True, only
     i_choice = np.random.choice(cam_cnt, cam_cnt, False)
     i_split = [list(range(i, i + cam_cnt // 3)) for i in range(0, cam_cnt, cam_cnt // 3)]
     train_idx, validate_idx, test_idx = [i_choice[s] for s in i_split]
-    print(i_choice)
 
     if split == 'train':
         img_files = [img_files[i] for i in train_idx]
@@ -89,16 +87,14 @@ def load_data_split(basedir, scene, split, skip=1, try_load_min_depth=True, only
         cam_cnt = pose_files.shape[0]
     else:
         print('fatal error!')
-    print(len(img_files))
-    print(len(mask_files))
-    print(len(mindepth_files))
-    print(pose_files.shape)
-    print(cam_cnt)
-
 
     H, W = 480, 640
 
-
+    print(f"Dataloader Type : {split}")
+    print(f"Number of img files : {len(img_files)}")
+    print(f"Number of pose files : {pose_files.shape}")
+    print(f"Image size : {H} * {W}")
+    print(f"Preprocess facter : {scale_factor}")
 
     # create ray samplers
     ray_samplers = []
@@ -132,6 +128,3 @@ if __name__ == "__main__":
         try_load_min_depth,
         only_img_files
     )
-
-
-    pass
