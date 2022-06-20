@@ -9,7 +9,8 @@ import os
 # from collections import OrderedDict
 # from ddp_model import NerfNet
 import time
-from data_loader_split import load_data_split
+# from data_loader_split import load_data_split
+from carla_loader_split import load_data_split
 from utils import mse2psnr, colorize_np, to8b
 import imageio
 from ddp_train_nerf import config_parser, setup_logger, setup, cleanup, render_single_image, create_nerf
@@ -46,7 +47,7 @@ def ddp_test_nerf(rank, args):
                                'render_{}_{:06d}'.format(split, start))
         if rank == 0:
             os.makedirs(out_dir, exist_ok=True)
-
+        print(split)
         ###### load data and create ray samplers; each process should do this
         ray_samplers = load_data_split(args.datadir, args.scene, split, try_load_min_depth=args.load_min_depth)
         for idx in range(len(ray_samplers)):
