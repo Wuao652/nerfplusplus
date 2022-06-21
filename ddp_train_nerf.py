@@ -352,7 +352,7 @@ def ddp_train_nerf(rank, args):
     else:
         logger.info('setting batch size according to 12G gpu')
         args.N_rand = 512
-        args.chunk_size = 4096
+        args.chunk_size = 1024
 
     ###### Create log dir and copy the config file
     if rank == 0:
@@ -522,10 +522,10 @@ def ddp_train_nerf(rank, args):
                 name = 'optim_{}'.format(m)
                 to_save[name] = models[name].state_dict()
             torch.save(to_save, fpath)
-
     # clean up for multi-processing
     cleanup()
-
+    if rank == 0:
+        writer.close()
 
 def config_parser():
     import configargparse
@@ -537,7 +537,7 @@ def config_parser():
 
     parser.add_argument("--datadir", type=str, default="./data/custom_data", help='input data directory')
     parser.add_argument("--scene", type=str, default="carla_all", help='scene name')
-    parser.add_argument("--expname", type=str, default="carla_all", help='experiment name')
+    parser.add_argument("--expname", type=str, default="carla_all_2", help='experiment name')
     parser.add_argument("--basedir", type=str, default='./logs/', help='where to store ckpts and logs')
     parser.add_argument("--config", type=str, default=None, help='config file path')
     parser.add_argument("--ckpt_path", type=str, default=None,
@@ -547,7 +547,8 @@ def config_parser():
                         help='will load 1/N images from test/val sets, useful for large datasets like deepvoxels')
 
     ### TRAINING
-    parser.add_argument("--N_iters", type=int, default=250001, help='number of iterations')
+    # parser.add_argument("--N_iters", type=int, default=250001, help='number of iterations')
+    parser.add_argument("--N_iters", type=int, default=2, help='number of iterations')
     parser.add_argument("--N_rand", type=int, default=1024,
                         help='batch size (number of random rays per gradient step)')
     parser.add_argument("--lrate", type=float, default=5e-4, help='learning rate')
@@ -559,7 +560,7 @@ def config_parser():
     ### CASCADE
     parser.add_argument("--cascade_level", type=int, default=2,
                         help='number of cascade levels')
-    parser.add_argument("--cascade_samples", type=str, default='64,128',
+    parser.add_argument("--cascade_samples", type=str, default='128,128',
                         help='samples at each level')
 
     ### TESTING

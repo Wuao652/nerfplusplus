@@ -35,7 +35,7 @@ def ddp_test_nerf(rank, args):
     else:
         logger.info('setting batch size according to 12G gpu')
         args.N_rand = 512
-        args.chunk_size = 4096
+        args.chunk_size = 1024
 
     ###### create network and wrap in ddp; each process should do this
     start, models = create_nerf(rank, args)

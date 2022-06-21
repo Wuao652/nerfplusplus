@@ -53,7 +53,7 @@ def load_data_split(basedir, scene, split, skip=1, try_load_min_depth=True, only
     # array([ -52.07071, -230.9998 ], dtype=float32)
     pose_files[:, :-1, -1] = pose_files[:, :-1, -1] - np.mean(xy, 0)
 
-    scale_factor = 6.0
+    scale_factor = 10.0
     pose_files[:, :, -1] /= scale_factor
 
     t = np.tile(
