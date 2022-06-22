@@ -14,6 +14,9 @@ def get_rays_single_image(H, W, intrinsics, c2w):
     :param intrinsics: 4 by 4 intrinsic matrix
     :param c2w: 4 by 4 camera to world extrinsic matrix
     :return:
+        rays_o: (H * W, 3) ray origins for each pixel
+        rays_d: (H * W, 3) ray directions for each pixel
+        depth: (H * W, ) z-value of the world origin in camera coordinate
     '''
     u, v = np.meshgrid(np.arange(W), np.arange(H))
 
@@ -172,3 +175,23 @@ class RaySamplerSingleImage(object):
                 ret[k] = torch.from_numpy(ret[k])
 
         return ret
+
+if __name__ == "__main__":
+    H, W = 480, 640
+    intrinsics = np.array([[224.06641222710715, 0.0, 320.0, 0.0],
+                           [0.0, 224.06641222710715, 240.0, 0.0],
+                           [0.0, 0.0, 1.0, 0.0],
+                           [0.0, 0.0, 0.0, 1.0]], dtype=np.float32)
+
+    pose = np.array([[-7.5747752e-01,  1.6614874e-01, -6.3136548e-01,  3.7920189e-01],
+                     [ 6.5286124e-01,  1.9277288e-01, -7.3253727e-01,  4.3174285e-01],
+                     [ 7.4505806e-09, -9.6707457e-01, -2.5449321e-01,  1.5000001e-01],
+                     [ 0.0000000e+00,  0.0000000e+00,  0.0000000e+00,  1.0000000e+00]], dtype=np.float32)
+
+
+    img_files = './data/custom_data/carla_all/r_00147.png'
+    raysampler = RaySamplerSingleImage(H=H, W=W, intrinsics=intrinsics, c2w=pose,
+                          img_path='./data/custom_data/carla_all/r_00147.png',
+                          mask_path=None,
+                          min_depth_path=None,
+                          max_depth=None)
