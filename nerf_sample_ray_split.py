@@ -191,7 +191,7 @@ if __name__ == "__main__":
 
     img_files = './data/custom_data/carla_all/r_00147.png'
     raysampler = RaySamplerSingleImage(H=H, W=W, intrinsics=intrinsics, c2w=pose,
-                          img_path='./data/custom_data/carla_all/r_00147.png',
+                          img_path=img_files,
                           mask_path=None,
                           min_depth_path=None,
                           max_depth=None)
