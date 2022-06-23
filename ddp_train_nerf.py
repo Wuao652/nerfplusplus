@@ -531,13 +531,14 @@ def config_parser():
     import configargparse
     parser = configargparse.ArgumentParser()
     ### INPUT
-    # parser.add_argument("--datadir", type=str, default="./data/tanks_and_temples", help='input data directory')
-    # parser.add_argument("--scene", type=str, default="tat_intermediate_Playground", help='scene name')
-    # parser.add_argument("--expname", type=str, default="tat_intermediate_Playground", help='experiment name')
+    # parser.add_argument("--datadir", type=str, default="./data/custom_data", help='input data directory')
+    # parser.add_argument("--scene", type=str, default="carla_all", help='scene name')
+    # parser.add_argument("--expname", type=str, default="carla_all_2", help='experiment name')
 
-    parser.add_argument("--datadir", type=str, default="./data/custom_data", help='input data directory')
-    parser.add_argument("--scene", type=str, default="carla_all", help='scene name')
-    parser.add_argument("--expname", type=str, default="carla_all_2", help='experiment name')
+    parser.add_argument("--datadir", type=str, default="./data/carla_data/gt", help='input data directory')
+    parser.add_argument("--scene", type=str, default="9actors", help='scene name')
+    parser.add_argument("--expname", type=str, default="gt_9actors_0", help='experiment name')
+
     parser.add_argument("--basedir", type=str, default='./logs/', help='where to store ckpts and logs')
     parser.add_argument("--config", type=str, default=None, help='config file path')
     parser.add_argument("--ckpt_path", type=str, default=None,

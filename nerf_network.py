@@ -140,3 +140,7 @@ class MLPNet(nn.Module):
         ret = OrderedDict([('rgb', rgb),
                            ('sigma', sigma.squeeze(-1))])
         return ret
+
+if __name__ == "__main__":
+    mlp = MLPNet()
+    print(mlp)
