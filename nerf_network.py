@@ -142,5 +142,10 @@ class MLPNet(nn.Module):
         return ret
 
 if __name__ == "__main__":
+    embedder = Embedder(input_dim=3,
+                        max_freq_log2=10-1,
+                        N_freqs=10)
     mlp = MLPNet()
     print(mlp)
+    input = torch.rand((1, 6))
+    out = mlp(input)
