@@ -9,7 +9,7 @@ from collections import OrderedDict
 from ddp_model import NerfNetWithAutoExpo
 import time
 # from data_loader_split import load_data_split
-from carla_loader_split import load_data_split
+from dehaze_loader_split import load_data_split
 import numpy as np
 from tensorboardX import SummaryWriter
 from utils import img2mse, mse2psnr, img_HWC2CHW, colorize, TINY_NUMBER
@@ -535,7 +535,7 @@ def config_parser():
     # parser.add_argument("--scene", type=str, default="carla_all", help='scene name')
     # parser.add_argument("--expname", type=str, default="carla_all_2", help='experiment name')
 
-    parser.add_argument("--datadir", type=str, default="./data/carla_data/gt", help='input data directory')
+    parser.add_argument("--datadir", type=str, default="./data/carla_data", help='input data directory')
     parser.add_argument("--scene", type=str, default="9actors", help='scene name')
     parser.add_argument("--expname", type=str, default="gt_9actors_0", help='experiment name')
 
