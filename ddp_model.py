@@ -186,3 +186,38 @@ class NerfNetWithAutoExpo(nn.Module):
             ret['autoexpo'] = (scale, shift)
 
         return ret
+
+if __name__ == '__main__':
+    fg_embedder_position = Embedder(input_dim=3,
+                                    max_freq_log2=10 - 1,
+                                    N_freqs=10)
+    print(fg_embedder_position.input_dim)
+    print(fg_embedder_position.out_dim)
+    fg_embedder_viewdir = Embedder(input_dim=3,
+                                   max_freq_log2=4 - 1,
+                                   N_freqs=4)
+    print(fg_embedder_viewdir.input_dim)
+    print(fg_embedder_viewdir.out_dim)
+    fg_net = MLPNet(D=8, W=256,
+                    input_ch=fg_embedder_position.out_dim,
+                    input_ch_viewdirs=fg_embedder_viewdir.out_dim,
+                    use_viewdirs=True)
+    print(fg_net)
+
+    print('-----------------------------------------------------')
+
+    bg_embedder_position = Embedder(input_dim=4,
+                                    max_freq_log2=10 - 1,
+                                    N_freqs=10)
+    print(bg_embedder_position.input_dim)
+    print(bg_embedder_position.out_dim)
+    bg_embedder_viewdir = Embedder(input_dim=3,
+                                   max_freq_log2=4 - 1,
+                                   N_freqs=4)
+    print(bg_embedder_viewdir.input_dim)
+    print(bg_embedder_viewdir.out_dim)
+    bg_net = MLPNet(D=8, W=256,
+                    input_ch=bg_embedder_position.out_dim,
+                    input_ch_viewdirs=bg_embedder_viewdir.out_dim,
+                    use_viewdirs=True)
+    print(bg_net)

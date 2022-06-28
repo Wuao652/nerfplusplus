@@ -147,5 +147,6 @@ if __name__ == "__main__":
                         N_freqs=10)
     mlp = MLPNet()
     print(mlp)
-    input = torch.rand((1, 6))
+    input = torch.rand((1, 128, 6))
     out = mlp(input)
+    print(input.shape)
