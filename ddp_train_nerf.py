@@ -535,9 +535,9 @@ def config_parser():
     # parser.add_argument("--scene", type=str, default="carla_all", help='scene name')
     # parser.add_argument("--expname", type=str, default="carla_all_2", help='experiment name')
 
-    parser.add_argument("--datadir", type=str, default="./data/carla_data/gt", help='input data directory')
+    parser.add_argument("--datadir", type=str, default="./data/carla_data/hazy", help='input data directory')
     parser.add_argument("--scene", type=str, default="9actors", help='scene name')
-    parser.add_argument("--expname", type=str, default="gt_9actors_0", help='experiment name')
+    parser.add_argument("--expname", type=str, default="hazy_9actors_0", help='experiment name')
 
     parser.add_argument("--basedir", type=str, default='./logs/', help='where to store ckpts and logs')
     parser.add_argument("--config", type=str, default=None, help='config file path')
@@ -549,7 +549,7 @@ def config_parser():
 
     ### TRAINING
     # parser.add_argument("--N_iters", type=int, default=250001, help='number of iterations')
-    parser.add_argument("--N_iters", type=int, default=2, help='number of iterations')
+    parser.add_argument("--N_iters", type=int, default=250001, help='number of iterations')
     parser.add_argument("--N_rand", type=int, default=1024,
                         help='batch size (number of random rays per gradient step)')
     parser.add_argument("--lrate", type=float, default=5e-4, help='learning rate')
