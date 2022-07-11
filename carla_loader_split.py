@@ -116,15 +116,14 @@ def load_data_split(basedir, scene, split, skip=1, try_load_min_depth=True, only
 
 
 if __name__ == "__main__":
-    basedir = './data/custom_data'
-    scene = 'carla_all'
+    basedir = './data/carla_data/hazy'
+    scene = '9actors'
     split = 'train'
     try_load_min_depth = True
     only_img_files = False
-    load_data_split(
+    train_ray_samplers = load_data_split(
         basedir,
         scene,
         split,
         try_load_min_depth,
-        only_img_files
-    )
+        only_img_files)

@@ -537,7 +537,7 @@ def config_parser():
 
     parser.add_argument("--datadir", type=str, default="./data/carla_data/hazy", help='input data directory')
     parser.add_argument("--scene", type=str, default="9actors", help='scene name')
-    parser.add_argument("--expname", type=str, default="hazy_9actors_0", help='experiment name')
+    parser.add_argument("--expname", type=str, default="dcp_nerf_0", help='experiment name')
 
     parser.add_argument("--basedir", type=str, default='./logs/', help='where to store ckpts and logs')
     parser.add_argument("--config", type=str, default=None, help='config file path')
