@@ -142,8 +142,8 @@ class RaySamplerSingleImage(object):
         win_rad = 1
         max_num_neigh = (2 * win_rad + 1) ** 2
 
-        selected_pixels = [0, 4487, 306558, 307199]
-
+        # selected_pixels = [0, 4487, 306558, 307199]
+        selected_pixels = np.random.choice(self.H*self.W, size=(N_rand,), replace=False)
         num_pixel_in_patches = []
         selected_patch_indices = []
 
@@ -175,7 +175,23 @@ class RaySamplerSingleImage(object):
         else:
             min_depth = 1e-4 * np.ones_like(rays_d[..., 0])
         print("good!")
-        pass
+
+        ret = OrderedDict([
+            ('ray_o', rays_o),
+            ('ray_d', rays_d),
+            ('depth', depth),
+            ('rgb', rgb),
+            ('coarse_t', coarse_t),
+            ('min_depth', min_depth),
+            ('img_name', self.img_path),
+            ('num_pixel_in_patches', num_pixel_in_patches)
+        ])
+        # return torch tensors
+        for k in ret:
+            if isinstance(ret[k], np.ndarray):
+                ret[k] = torch.from_numpy(ret[k])
+
+        return ret
 
     def get_all(self):
         if self.min_depth is not None:
@@ -275,7 +291,7 @@ if __name__ == "__main__":
                           mask_path=None,
                           min_depth_path=None,
                           max_depth=None)
-    raysampler.random_sample(512)
+    ret = raysampler.random_sample(512)
 
     # Lambda = 0.0001
     #
