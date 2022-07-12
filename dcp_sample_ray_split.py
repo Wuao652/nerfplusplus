@@ -49,6 +49,8 @@ def get_rays_single_image(H, W, intrinsics, c2w):
 class RaySamplerSingleImage(object):
     def __init__(self, H, W, intrinsics, c2w,
                        img_path=None,
+                       a_path=None,
+                       t_path=None,
                        resolution_level=1,
                        mask_path=None,
                        min_depth_path=None,
@@ -60,6 +62,8 @@ class RaySamplerSingleImage(object):
         self.c2w_mat = c2w
 
         self.img_path = img_path
+        self.a_path = a_path
+        self.t_path = t_path
         self.mask_path = mask_path
         self.min_depth_path = min_depth_path
         self.max_depth = max_depth
@@ -71,16 +75,16 @@ class RaySamplerSingleImage(object):
         self.win_size = 15
         self.omega = 0.95
 
-        # dark_channel image of the input hazy image. [H, W]
-        self.dark_channel = get_dark_channel(self.img.reshape(H, W, -1), self.win_size)
-        # air_light. [1, 3]
-        self.air_light = get_atmosphere(self.img.reshape(H, W, -1), self.dark_channel)
-        # coarse transmission map. [H, W]
-        self.coarse_t = get_transmission_estimate(self.img.reshape(H, W, -1),
-                                                  self.air_light,
-                                                  self.omega,
-                                                  self.win_size)
-        self.coarse_t = self.coarse_t.reshape(-1)   # [H*W]
+        # # dark_channel image of the input hazy image. [H, W]
+        # self.dark_channel = get_dark_channel(self.img.reshape(H, W, -1), self.win_size)
+        # # air_light. [1, 3]
+        # self.air_light = get_atmosphere(self.img.reshape(H, W, -1), self.dark_channel)
+        # # coarse transmission map. [H, W]
+        # self.coarse_t = get_transmission_estimate(self.img.reshape(H, W, -1),
+        #                                           self.air_light,
+        #                                           self.omega,
+        #                                           self.win_size)
+        # self.coarse_t = self.coarse_t.reshape(-1)   # [H*W]
 
         # self.img [H*W, 3]
         # self.coarse_t [H*W]
@@ -102,6 +106,19 @@ class RaySamplerSingleImage(object):
                 self.img = self.img.reshape((-1, 3))
             else:
                 self.img = None
+
+            # load the air_light [1, 3]
+            if self.a_path is not None:
+                self.air_light = np.loadtxt(self.a_path)
+                self.air_light = self.air_light.reshape(1, 3)
+            else:
+                self.air_light = None
+            # load the coarse transmission map [H, W]
+            if self.t_path is not None:
+                self.coarse_t = imageio.imread(self.t_path).astype(np.float64) / 255.
+                self.coarse_t = self.coarse_t.reshape(-1)  # [H*W]
+            else:
+                self.coarse_t = None
 
             if self.mask_path is not None:
                 self.mask = imageio.imread(self.mask_path).astype(np.float32) / 255.
@@ -296,32 +313,31 @@ if __name__ == "__main__":
     a_files = f"/home/dennis/nerfplusplus/data/carla_data/hazy/9actors_trans/a_00147.txt"
     raysampler = RaySamplerSingleImage(H=H, W=W, intrinsics=intrinsics, c2w=pose,
                           img_path=img_files,
+                          a_path=a_files,
+                          t_path=t_files,
                           mask_path=None,
                           min_depth_path=None,
                           max_depth=None)
-    # ret = raysampler.random_sample(512)
+    ret = raysampler.random_sample(512)
 
-    Lambda = 0.0001
-
-    img = raysampler.img.reshape(H, W, -1)
-    a1 = np.loadtxt(a_files)
-    t1 = imageio.imread(t_files).astype(np.float64) / 255.
-    L = get_laplacian(img)
-    A = L + Lambda * scipy.sparse.eye(H * W)
-    b = Lambda * t1.T.reshape(-1)
-    x = scipy.sparse.linalg.spsolve(A, b)
-    transmission = x.reshape((W, H)).T
-    radiance = get_radiance(img, transmission, a1)
-
-    print(a1)
-    print(a1.shape)
-
-    plt.figure()
-    plt.imshow(img)
-    plt.figure()
-    plt.imshow(gray2rgb(t1))
-    plt.figure()
-    plt.imshow(gray2rgb(transmission))
-    plt.figure()
-    plt.imshow(radiance)
-    plt.show()
+    # Lambda = 0.0001
+    # img = raysampler.img.reshape(H, W, -1)
+    # print(raysampler.air_light)
+    # print(raysampler.air_light.shape)
+    # L = get_laplacian(img)
+    # A = L + Lambda * scipy.sparse.eye(H * W)
+    # b = Lambda * raysampler.coarse_t.reshape(H, W).T.reshape(-1)
+    # x = scipy.sparse.linalg.spsolve(A, b)
+    # transmission = x.reshape((W, H)).T
+    # radiance = get_radiance(img, transmission, raysampler.air_light)
+    #
+    #
+    # plt.figure()
+    # plt.imshow(img)
+    # plt.figure()
+    # plt.imshow(gray2rgb(raysampler.coarse_t.reshape(H, W)))
+    # plt.figure()
+    # plt.imshow(gray2rgb(transmission))
+    # plt.figure()
+    # plt.imshow(radiance)
+    # plt.show()
