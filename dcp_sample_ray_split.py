@@ -67,13 +67,26 @@ class RaySamplerSingleImage(object):
         self.resolution_level = -1
         self.set_resolution_level(resolution_level)
 
-        # add dark channel statistics
-        # self.air_light
-        # self.coarse_t
-
         # window size of the image patch using in dcp
         self.win_size = 15
         self.omega = 0.95
+
+        # dark_channel image of the input hazy image. [H, W]
+        self.dark_channel = get_dark_channel(self.img.reshape(H, W, -1), self.win_size)
+        # air_light. [1, 3]
+        self.air_light = get_atmosphere(self.img.reshape(H, W, -1), self.dark_channel)
+        # coarse transmission map. [H, W]
+        self.coarse_t = get_transmission_estimate(self.img.reshape(H, W, -1),
+                                                  self.air_light,
+                                                  self.omega,
+                                                  self.win_size)
+        self.coarse_t = self.coarse_t.reshape(-1)   # [H*W]
+
+        # self.img [H*W, 3]
+        # self.coarse_t [H*W]
+        # self.rays_o [H*W, 3]
+        # self.rays_d [H*W, 3]
+        # self.depth [H*W]
 
     def set_resolution_level(self, resolution_level):
         if resolution_level != self.resolution_level:
@@ -113,6 +126,9 @@ class RaySamplerSingleImage(object):
         else:
             return None
 
+    def random_sample(self, N_rand):
+        pass
+
     def get_all(self):
         if self.min_depth is not None:
             min_depth = self.min_depth
@@ -133,65 +149,65 @@ class RaySamplerSingleImage(object):
                 ret[k] = torch.from_numpy(ret[k])
         return ret
 
-    def random_sample(self, N_rand, center_crop=False):
-        '''
-        :param N_rand: number of rays to be casted
-        :return:
-        '''
-        if center_crop:
-            half_H = self.H // 2
-            half_W = self.W // 2
-            quad_H = half_H // 2
-            quad_W = half_W // 2
-
-            # pixel coordinates
-            u, v = np.meshgrid(np.arange(half_W-quad_W, half_W+quad_W),
-                               np.arange(half_H-quad_H, half_H+quad_H))
-            u = u.reshape(-1)
-            v = v.reshape(-1)
-
-            select_inds = np.random.choice(u.shape[0], size=(N_rand,), replace=False)
-
-            # Convert back to original image
-            select_inds = v[select_inds] * self.W + u[select_inds]
-        else:
-            # Random from one image
-            select_inds = np.random.choice(self.H*self.W, size=(N_rand,), replace=False)
-
-        rays_o = self.rays_o[select_inds, :]    # [N_rand, 3]
-        rays_d = self.rays_d[select_inds, :]    # [N_rand, 3]
-        depth = self.depth[select_inds]         # [N_rand, ]
-
-        if self.img is not None:
-            rgb = self.img[select_inds, :]          # [N_rand, 3]
-        else:
-            rgb = None
-
-        if self.mask is not None:
-            mask = self.mask[select_inds]
-        else:
-            mask = None
-
-        if self.min_depth is not None:
-            min_depth = self.min_depth[select_inds]
-        else:
-            min_depth = 1e-4 * np.ones_like(rays_d[..., 0])
-
-        ret = OrderedDict([
-            ('ray_o', rays_o),
-            ('ray_d', rays_d),
-            ('depth', depth),
-            ('rgb', rgb),
-            ('mask', mask),
-            ('min_depth', min_depth),
-            ('img_name', self.img_path)
-        ])
-        # return torch tensors
-        for k in ret:
-            if isinstance(ret[k], np.ndarray):
-                ret[k] = torch.from_numpy(ret[k])
-
-        return ret
+    # def random_sample(self, N_rand, center_crop=False):
+    #     '''
+    #     :param N_rand: number of rays to be casted
+    #     :return:
+    #     '''
+    #     if center_crop:
+    #         half_H = self.H // 2
+    #         half_W = self.W // 2
+    #         quad_H = half_H // 2
+    #         quad_W = half_W // 2
+    #
+    #         # pixel coordinates
+    #         u, v = np.meshgrid(np.arange(half_W-quad_W, half_W+quad_W),
+    #                            np.arange(half_H-quad_H, half_H+quad_H))
+    #         u = u.reshape(-1)
+    #         v = v.reshape(-1)
+    #
+    #         select_inds = np.random.choice(u.shape[0], size=(N_rand,), replace=False)
+    #
+    #         # Convert back to original image
+    #         select_inds = v[select_inds] * self.W + u[select_inds]
+    #     else:
+    #         # Random from one image
+    #         select_inds = np.random.choice(self.H*self.W, size=(N_rand,), replace=False)
+    #
+    #     rays_o = self.rays_o[select_inds, :]    # [N_rand, 3]
+    #     rays_d = self.rays_d[select_inds, :]    # [N_rand, 3]
+    #     depth = self.depth[select_inds]         # [N_rand, ]
+    #
+    #     if self.img is not None:
+    #         rgb = self.img[select_inds, :]          # [N_rand, 3]
+    #     else:
+    #         rgb = None
+    #
+    #     if self.mask is not None:
+    #         mask = self.mask[select_inds]
+    #     else:
+    #         mask = None
+    #
+    #     if self.min_depth is not None:
+    #         min_depth = self.min_depth[select_inds]
+    #     else:
+    #         min_depth = 1e-4 * np.ones_like(rays_d[..., 0])
+    #
+    #     ret = OrderedDict([
+    #         ('ray_o', rays_o),
+    #         ('ray_d', rays_d),
+    #         ('depth', depth),
+    #         ('rgb', rgb),
+    #         ('mask', mask),
+    #         ('min_depth', min_depth),
+    #         ('img_name', self.img_path)
+    #     ])
+    #     # return torch tensors
+    #     for k in ret:
+    #         if isinstance(ret[k], np.ndarray):
+    #             ret[k] = torch.from_numpy(ret[k])
+    #
+    #     return ret
 
 if __name__ == "__main__":
     H, W = 480, 640
