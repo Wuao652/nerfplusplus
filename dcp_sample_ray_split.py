@@ -292,38 +292,36 @@ if __name__ == "__main__":
                      [ 0.0000000e+00,  0.0000000e+00,  0.0000000e+00,  1.0000000e+00]], dtype=np.float32)
 
     img_files = './data/carla_data/hazy/9actors/r_00147.png'
+    t_files = f"/home/dennis/nerfplusplus/data/carla_data/hazy/9actors_trans/t_00147.png"
+    a_files = f"/home/dennis/nerfplusplus/data/carla_data/hazy/9actors_trans/a_00147.txt"
     raysampler = RaySamplerSingleImage(H=H, W=W, intrinsics=intrinsics, c2w=pose,
                           img_path=img_files,
                           mask_path=None,
                           min_depth_path=None,
                           max_depth=None)
-    ret = raysampler.random_sample(512)
+    # ret = raysampler.random_sample(512)
 
-    # Lambda = 0.0001
-    #
-    # img = raysampler.img.reshape(H, W, -1)
-    # dark_channel = get_dark_channel(img)
-    # atmosphere = get_atmosphere(img, dark_channel)
-    # trans_est = get_transmission_estimate(img, atmosphere)
-    #
-    # L = get_laplacian(img)
-    # A = L + Lambda * scipy.sparse.eye(H * W)
-    # b = Lambda * trans_est.T.reshape(-1)
-    # x = scipy.sparse.linalg.spsolve(A, b)
-    # transmission = x.reshape((W, H)).T
-    # radiance = get_radiance(img, transmission, atmosphere)
-    #
-    # print(atmosphere)
-    # print(atmosphere.shape)
-    #
-    # plt.figure()
-    # plt.imshow(img)
-    # plt.figure()
-    # plt.imshow(gray2rgb(dark_channel))
-    # plt.figure()
-    # plt.imshow(gray2rgb(trans_est))
-    # plt.figure()
-    # plt.imshow(gray2rgb(transmission))
-    # plt.figure()
-    # plt.imshow(radiance)
-    # plt.show()
+    Lambda = 0.0001
+
+    img = raysampler.img.reshape(H, W, -1)
+    a1 = np.loadtxt(a_files)
+    t1 = imageio.imread(t_files).astype(np.float64) / 255.
+    L = get_laplacian(img)
+    A = L + Lambda * scipy.sparse.eye(H * W)
+    b = Lambda * t1.T.reshape(-1)
+    x = scipy.sparse.linalg.spsolve(A, b)
+    transmission = x.reshape((W, H)).T
+    radiance = get_radiance(img, transmission, a1)
+
+    print(a1)
+    print(a1.shape)
+
+    plt.figure()
+    plt.imshow(img)
+    plt.figure()
+    plt.imshow(gray2rgb(t1))
+    plt.figure()
+    plt.imshow(gray2rgb(transmission))
+    plt.figure()
+    plt.imshow(radiance)
+    plt.show()
