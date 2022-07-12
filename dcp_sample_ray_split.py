@@ -3,7 +3,16 @@ from collections import OrderedDict
 import torch
 import cv2
 import imageio
+import matplotlib.pyplot as plt
+from dcp_utils import gray2rgb
+from dcp_utils import get_dark_channel, \
+    get_atmosphere, \
+    get_transmission_estimate, \
+    get_laplacian, \
+    get_radiance
 
+import scipy
+import scipy.sparse.linalg
 ########################################################################################################################
 # ray batch sampling
 ########################################################################################################################
@@ -58,6 +67,14 @@ class RaySamplerSingleImage(object):
         self.resolution_level = -1
         self.set_resolution_level(resolution_level)
 
+        # add dark channel statistics
+        # self.air_light
+        # self.coarse_t
+
+        # window size of the image patch using in dcp
+        self.win_size = 15
+        self.omega = 0.95
+
     def set_resolution_level(self, resolution_level):
         if resolution_level != self.resolution_level:
             self.resolution_level = resolution_level
@@ -67,7 +84,7 @@ class RaySamplerSingleImage(object):
             self.intrinsics[:2, :3] /= resolution_level
             # only load image at this time
             if self.img_path is not None:
-                self.img = imageio.imread(self.img_path).astype(np.float32) / 255.
+                self.img = imageio.imread(self.img_path).astype(np.float64) / 255.
                 self.img = cv2.resize(self.img, (self.W, self.H), interpolation=cv2.INTER_AREA)
                 self.img = self.img.reshape((-1, 3))
             else:
@@ -188,10 +205,37 @@ if __name__ == "__main__":
                      [ 7.4505806e-09, -9.6707457e-01, -2.5449321e-01,  1.5000001e-01],
                      [ 0.0000000e+00,  0.0000000e+00,  0.0000000e+00,  1.0000000e+00]], dtype=np.float32)
 
-
     img_files = './data/carla_data/hazy/9actors/r_00147.png'
     raysampler = RaySamplerSingleImage(H=H, W=W, intrinsics=intrinsics, c2w=pose,
                           img_path=img_files,
                           mask_path=None,
                           min_depth_path=None,
                           max_depth=None)
+    Lambda = 0.0001
+
+    img = raysampler.img.reshape(H, W, -1)
+    dark_channel = get_dark_channel(img)
+    atmosphere = get_atmosphere(img, dark_channel)
+    trans_est = get_transmission_estimate(img, atmosphere)
+
+    L = get_laplacian(img)
+    A = L + Lambda * scipy.sparse.eye(H * W)
+    b = Lambda * trans_est.T.reshape(-1)
+    x = scipy.sparse.linalg.spsolve(A, b)
+    transmission = x.reshape((W, H)).T
+    radiance = get_radiance(img, transmission, atmosphere)
+
+    print(atmosphere)
+    print(atmosphere.shape)
+
+    plt.figure()
+    plt.imshow(img)
+    plt.figure()
+    plt.imshow(gray2rgb(dark_channel))
+    plt.figure()
+    plt.imshow(gray2rgb(trans_est))
+    plt.figure()
+    plt.imshow(gray2rgb(transmission))
+    plt.figure()
+    plt.imshow(radiance)
+    plt.show()
