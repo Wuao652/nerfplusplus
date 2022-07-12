@@ -351,7 +351,8 @@ def ddp_train_nerf(rank, args):
         args.chunk_size = 8192
     else:
         logger.info('setting batch size according to 12G gpu')
-        args.N_rand = 512
+        # args.N_rand = 512
+        args.N_rand = 50
         args.chunk_size = 1024
 
     ###### Create log dir and copy the config file
@@ -406,7 +407,7 @@ def ddp_train_nerf(rank, args):
         scalars_to_log['resolution'] = ray_samplers[0].resolution_level
         # randomly sample rays and move to device
         i = np.random.randint(low=0, high=len(ray_samplers))
-        ray_batch = ray_samplers[i].random_sample(args.N_rand, center_crop=False)
+        ray_batch = ray_samplers[i].random_sample(args.N_rand)
         for key in ray_batch:
             if torch.is_tensor(ray_batch[key]):
                 ray_batch[key] = ray_batch[key].to(rank)
@@ -537,7 +538,7 @@ def config_parser():
 
     parser.add_argument("--datadir", type=str, default="./data/carla_data/hazy", help='input data directory')
     parser.add_argument("--scene", type=str, default="9actors", help='scene name')
-    parser.add_argument("--expname", type=str, default="dcp_nerf_0", help='experiment name')
+    parser.add_argument("--expname", type=str, default="dcp_nerf_test", help='experiment name')
 
     parser.add_argument("--basedir", type=str, default='./logs/', help='where to store ckpts and logs')
     parser.add_argument("--config", type=str, default=None, help='config file path')

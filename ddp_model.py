@@ -71,6 +71,11 @@ class NerfNet(nn.Module):
                              input_ch_viewdirs=self.bg_embedder_viewdir.out_dim,
                              use_viewdirs=args.use_viewdirs)
 
+        # scattering parameter
+        self.beta = nn.Parameter(
+            torch.rand(1)
+        )
+
     def forward(self, ray_o, ray_d, fg_z_max, fg_z_vals, bg_z_vals):
         '''
         :param ray_o, ray_d: [..., 3]
@@ -129,9 +134,11 @@ class NerfNet(nn.Module):
 
         # composite foreground and background
         bg_rgb_map = bg_lambda.unsqueeze(-1) * bg_rgb_map
-        bg_depth_map = bg_lambda * bg_depth_map
-        rgb_map = fg_rgb_map + bg_rgb_map
+        bg_depth_map = bg_lambda * bg_depth_map   # [512,]
+        rgb_map = fg_rgb_map + bg_rgb_map   # [512, 3]
 
+        depth_map = fg_depth_map + bg_depth_map
+        trans_map = torch.exp(-1. * torch.abs(self.beta) * depth_map)
         ret = OrderedDict([('rgb', rgb_map),            # loss
                            ('fg_weights', fg_weights),  # importance sampling
                            ('bg_weights', bg_weights),  # importance sampling
@@ -139,7 +146,10 @@ class NerfNet(nn.Module):
                            ('fg_depth', fg_depth_map),
                            ('bg_rgb', bg_rgb_map),
                            ('bg_depth', bg_depth_map),
-                           ('bg_lambda', bg_lambda)])
+                           ('bg_lambda', bg_lambda),
+                           # add by Wuao
+                           ('full_depth', depth_map),
+                           ('trans_map', trans_map)])
         return ret
 
 
