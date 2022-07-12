@@ -4,7 +4,7 @@ import torch
 import cv2
 import imageio
 import matplotlib.pyplot as plt
-from dcp_utils import gray2rgb
+from dcp_utils import idx2sub, gray2rgb
 from dcp_utils import get_dark_channel, \
     get_atmosphere, \
     get_transmission_estimate, \
@@ -127,6 +127,54 @@ class RaySamplerSingleImage(object):
             return None
 
     def random_sample(self, N_rand):
+        """
+        randomly sample N_rand image patches, find the corresponding rgb, coarse_t, ray_o,
+        ray_d, depth, mask, min_depth. Then, stack the pixels contain in the image patch
+        and store them in an OrderedDict.
+        :param N_rand: number of image patches to be cast.
+        :return:
+            ret: [H, W] np array of the dark channel image of the input hazy image.
+
+        """
+        img_size = self.H * self.W  # 307200
+        ind_mat = np.arange(img_size).reshape(self.H, self.W)
+
+        win_rad = 1
+        max_num_neigh = (2 * win_rad + 1) ** 2
+
+        selected_pixels = [0, 4487, 306558, 307199]
+
+        num_pixel_in_patches = []
+        selected_patch_indices = []
+
+        for idx in selected_pixels:
+            i, j = idx2sub(self.H, self.W, idx)
+            H_min = max(0, i - win_rad)
+            H_max = min(self.H, i + win_rad)
+            W_min = max(0, j - win_rad)
+            W_max = min(self.W, j + win_rad)
+
+            win_inds = ind_mat[H_min: H_max + 1, W_min: W_max + 1]
+            win_inds = win_inds.reshape(-1)
+            num_neigh = win_inds.size
+            num_pixel_in_patches.append(num_neigh)
+            selected_patch_indices.append(win_inds)
+
+        selected_patch_indices = np.concatenate(selected_patch_indices, -1)
+
+        rays_o = self.rays_o[selected_patch_indices, :]
+        rays_d = self.rays_d[selected_patch_indices, :]
+        depth = self.depth[selected_patch_indices]
+        coarse_t = self.coarse_t[selected_patch_indices]
+        if self.img is not None:
+            rgb = self.img[selected_patch_indices, :]
+        else:
+            rgb = None
+        if self.min_depth is not None:
+            min_depth = self.min_depth[selected_patch_indices]
+        else:
+            min_depth = 1e-4 * np.ones_like(rays_d[..., 0])
+        print("good!")
         pass
 
     def get_all(self):
@@ -227,31 +275,33 @@ if __name__ == "__main__":
                           mask_path=None,
                           min_depth_path=None,
                           max_depth=None)
-    Lambda = 0.0001
+    raysampler.random_sample(512)
 
-    img = raysampler.img.reshape(H, W, -1)
-    dark_channel = get_dark_channel(img)
-    atmosphere = get_atmosphere(img, dark_channel)
-    trans_est = get_transmission_estimate(img, atmosphere)
-
-    L = get_laplacian(img)
-    A = L + Lambda * scipy.sparse.eye(H * W)
-    b = Lambda * trans_est.T.reshape(-1)
-    x = scipy.sparse.linalg.spsolve(A, b)
-    transmission = x.reshape((W, H)).T
-    radiance = get_radiance(img, transmission, atmosphere)
-
-    print(atmosphere)
-    print(atmosphere.shape)
-
-    plt.figure()
-    plt.imshow(img)
-    plt.figure()
-    plt.imshow(gray2rgb(dark_channel))
-    plt.figure()
-    plt.imshow(gray2rgb(trans_est))
-    plt.figure()
-    plt.imshow(gray2rgb(transmission))
-    plt.figure()
-    plt.imshow(radiance)
-    plt.show()
+    # Lambda = 0.0001
+    #
+    # img = raysampler.img.reshape(H, W, -1)
+    # dark_channel = get_dark_channel(img)
+    # atmosphere = get_atmosphere(img, dark_channel)
+    # trans_est = get_transmission_estimate(img, atmosphere)
+    #
+    # L = get_laplacian(img)
+    # A = L + Lambda * scipy.sparse.eye(H * W)
+    # b = Lambda * trans_est.T.reshape(-1)
+    # x = scipy.sparse.linalg.spsolve(A, b)
+    # transmission = x.reshape((W, H)).T
+    # radiance = get_radiance(img, transmission, atmosphere)
+    #
+    # print(atmosphere)
+    # print(atmosphere.shape)
+    #
+    # plt.figure()
+    # plt.imshow(img)
+    # plt.figure()
+    # plt.imshow(gray2rgb(dark_channel))
+    # plt.figure()
+    # plt.imshow(gray2rgb(trans_est))
+    # plt.figure()
+    # plt.imshow(gray2rgb(transmission))
+    # plt.figure()
+    # plt.imshow(radiance)
+    # plt.show()

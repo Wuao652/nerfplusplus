@@ -3,6 +3,9 @@ import math
 import scipy
 import scipy.sparse.linalg
 
+def idx2sub(H, W, idx):
+    return idx // W, idx % W
+
 def gray2rgb(img):
     H, W = img.shape
     rgb = np.tile(img.reshape(H, W, -1), (1, 1, 3))
