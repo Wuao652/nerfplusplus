@@ -2,7 +2,8 @@ import os
 import numpy as np
 import imageio
 import logging
-from nerf_sample_ray_split import RaySamplerSingleImage
+# from nerf_sample_ray_split import RaySamplerSingleImage
+from dcp_sample_ray_split import RaySamplerSingleImage
 import glob
 
 def find_files(dir, exts):
