@@ -455,6 +455,8 @@ def ddp_train_nerf(rank, args):
             all_rets.append(ret)
 
             rgb_gt = ray_batch['rgb'].to(rank)
+            coarse_t_gt = ray_batch['coarse_t'].to(rank)
+
             if 'autoexpo' in ret:
                 scale, shift = ret['autoexpo']
                 scalars_to_log['level_{}/autoexpo_scale'.format(m)] = scale.item()
@@ -465,7 +467,8 @@ def ddp_train_nerf(rank, args):
                 loss = rgb_loss + args.lambda_autoexpo * (torch.abs(scale-1.)+torch.abs(shift))
             else:
                 rgb_loss = img2mse(ret['rgb'], rgb_gt)
-                loss = rgb_loss
+                data_loss = 0.0001 * img2mse(ret['trans_map'], coarse_t_gt)
+                loss = rgb_loss + data_loss
             scalars_to_log['level_{}/loss'.format(m)] = rgb_loss.item()
             scalars_to_log['level_{}/pnsr'.format(m)] = mse2psnr(rgb_loss.item())
             loss.backward()

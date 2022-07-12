@@ -196,7 +196,6 @@ class RaySamplerSingleImage(object):
             min_depth = self.min_depth[selected_patch_indices]
         else:
             min_depth = 1e-4 * np.ones_like(rays_d[..., 0])
-        print("good!")
 
         ret = OrderedDict([
             ('ray_o', rays_o),
