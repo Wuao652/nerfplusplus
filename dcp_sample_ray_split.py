@@ -120,6 +120,12 @@ class RaySamplerSingleImage(object):
             self.rays_o, self.rays_d, self.depth = get_rays_single_image(self.H, self.W,
                                                                          self.intrinsics, self.c2w_mat)
 
+    def get_air_light(self):
+        if self.air_light is not None:
+            return self.air_light
+        else:
+            return None
+
     def get_img(self):
         if self.img is not None:
             return self.img.reshape((self.H, self.W, 3))
