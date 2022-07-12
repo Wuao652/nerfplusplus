@@ -71,10 +71,9 @@ class RaySamplerSingleImage(object):
         self.resolution_level = -1
         self.set_resolution_level(resolution_level)
 
-        # window size of the image patch using in dcp
-        self.win_size = 15
-        self.omega = 0.95
-
+        # # window size of the image patch using in dcp
+        # self.win_size = 15
+        # self.omega = 0.95
         # # dark_channel image of the input hazy image. [H, W]
         # self.dark_channel = get_dark_channel(self.img.reshape(H, W, -1), self.win_size)
         # # air_light. [1, 3]
