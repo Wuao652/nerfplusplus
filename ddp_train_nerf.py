@@ -468,8 +468,37 @@ def ddp_train_nerf(rank, args):
             else:
                 rgb_loss = img2mse(ret['rgb'], rgb_gt)
                 data_loss = 0.0001 * img2mse(ret['trans_map'], coarse_t_gt)
-                loss = rgb_loss + data_loss
-            scalars_to_log['level_{}/loss'.format(m)] = rgb_loss.item()
+                # TODO: add a smooth loss term
+                # start implement smooth loss
+                # smooth loss E1 = t.T @ L @ t
+                ii = 0
+                M = len(ray_batch['num_pixel_in_patches'])
+                smooth_loss = 0.0
+                for jj in range(M):
+                    num_neigh = ray_batch['num_pixel_in_patches'][jj]
+                    start_idx, end_idx = ii, ii + num_neigh
+                    win_t = ret['trans_map'][start_idx:end_idx]   # [9, ]
+                    win_rgb = rgb_gt[start_idx:end_idx].to(torch.float32)
+                    # win_rgb = ret['rgb'][start_idx:end_idx]   # [9, 3]
+                    win_rgb_mean = torch.mean(win_rgb, dim=0, keepdim=True)
+                    win_rgb_var = torch.linalg.inv(
+                        (win_rgb.T @ win_rgb / num_neigh)
+                        - (win_rgb_mean.T @ win_rgb_mean)
+                        + (0.0000001 / num_neigh * torch.eye(3, device=win_rgb.device, dtype=win_rgb.dtype))
+                    )
+                    win_rgb_temp = win_rgb - win_rgb_mean.expand(num_neigh, 3)
+                    win_vals = -1. * (1. + win_rgb_temp @ win_rgb_var @ win_rgb_temp.T) / num_neigh \
+                               + torch.eye(num_neigh, device=win_rgb.device, dtype=win_rgb.dtype)
+                    temp_loss = win_t.reshape(1, num_neigh) @ win_vals @ win_t.reshape(num_neigh, 1)
+                    smooth_loss += temp_loss.reshape(-1)
+                    ii += num_neigh
+
+                # end implement smooth loss
+                loss = rgb_loss + data_loss + smooth_loss / M
+            scalars_to_log['level_{}/loss'.format(m)] = loss.item()
+            scalars_to_log['level_{}/rgb_loss'.format(m)] = rgb_loss.item()
+            scalars_to_log['level_{}/data_loss'.format(m)] = data_loss.item()
+            scalars_to_log['level_{}/smooth_loss'.format(m)] = smooth_loss.item() / M
             scalars_to_log['level_{}/pnsr'.format(m)] = mse2psnr(rgb_loss.item())
             loss.backward()
             optim.step()
