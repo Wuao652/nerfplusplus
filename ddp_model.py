@@ -130,7 +130,8 @@ class NerfNet(nn.Module):
         T = torch.cat((torch.ones_like(T[..., 0:1]), T), dim=-1)  # [..., N_samples]
         bg_weights = bg_alpha * T  # [..., N_samples]
         bg_rgb_map = torch.sum(bg_weights.unsqueeze(-1) * bg_raw['rgb'], dim=-2)  # [..., 3]
-        bg_depth_map = torch.sum(bg_weights * bg_z_vals, dim=-1)  # [...,]
+        # bg_depth_map = torch.sum(bg_weights * bg_z_vals, dim=-1)  # [...,]
+        bg_depth_map = torch.sum(bg_weights * torch.flip(_, dims=[-1, ]), dim=-1)   # [...,]
 
         # composite foreground and background
         bg_rgb_map = bg_lambda.unsqueeze(-1) * bg_rgb_map

@@ -16,6 +16,7 @@ from utils import img2mse, mse2psnr, img_HWC2CHW, colorize, TINY_NUMBER
 import logging
 import json
 
+from utils import gray2rgb
 
 logger = logging.getLogger(__package__)
 
@@ -241,7 +242,7 @@ def render_single_image(rank, world_size, models, ray_sampler, chunk_size):
         return None
 
 
-def log_view_to_tb(writer, global_step, log_data, gt_img, mask, prefix=''):
+def log_view_to_tb(writer, global_step, log_data, gt_img, A, mask, prefix=''):
     rgb_im = img_HWC2CHW(torch.from_numpy(gt_img))
     writer.add_image(prefix + 'rgb_gt', rgb_im, global_step)
 
@@ -269,6 +270,28 @@ def log_view_to_tb(writer, global_step, log_data, gt_img, mask, prefix=''):
         bg_lambda_im = img_HWC2CHW(colorize(bg_lambda, cmap_name='hot', append_cbar=True,
                                             mask=mask))
         writer.add_image(prefix + 'level_{}/bg_lambda'.format(m), bg_lambda_im, global_step)
+
+    # torch version of get_radiance
+    def get_radiance(img, t, A):
+        H, W, C = img.shape
+        rep_A = A.unsqueeze(0).expand(H, W, C)
+        max_t = torch.maximum(0.1 * torch.ones_like(t), t)
+        radiance = (img - rep_A) / max_t.reshape((H, W, -1)) + rep_A
+        return radiance
+
+    gt_img = torch.from_numpy(gt_img)
+    air = torch.from_numpy(A)
+    # visualize the trans_map and clear_img
+    trans_im = log_data[-1]['trans_map']
+    clear_im = get_radiance(gt_img, trans_im, air)
+
+    trans_im = img_HWC2CHW(gray2rgb(trans_im))
+    trans_im = torch.clamp(trans_im, min=0., max=1.)
+    writer.add_image(prefix + 'trans_map', trans_im, global_step)
+
+    clear_im = img_HWC2CHW(clear_im)
+    clear_im = torch.clamp(clear_im, min=0., max=1.)  # just in case diffuse+specular>1
+    writer.add_image(prefix + 'clear_rgb', clear_im, global_step)
 
 
 def setup(rank, world_size):
@@ -500,6 +523,10 @@ def ddp_train_nerf(rank, args):
             scalars_to_log['level_{}/data_loss'.format(m)] = data_loss.item()
             scalars_to_log['level_{}/smooth_loss'.format(m)] = smooth_loss.item() / M
             scalars_to_log['level_{}/pnsr'.format(m)] = mse2psnr(rgb_loss.item())
+
+            # add the plot of beta
+            scalars_to_log['level_{}/beta'.format(m)] = net.module.nerf_net.beta.item()
+
             loss.backward()
             optim.step()
 
@@ -530,7 +557,7 @@ def ddp_train_nerf(rank, args):
             dt = time.time() - time0
             if rank == 0:    # only main process should do this
                 logger.info('Logged a random validation view in {} seconds'.format(dt))
-                log_view_to_tb(writer, global_step, log_data, gt_img=val_ray_samplers[idx].get_img(), mask=None, prefix='val/')
+                log_view_to_tb(writer, global_step, log_data, gt_img=val_ray_samplers[idx].get_img(), A=val_ray_samplers[idx].get_air_light(), mask=None, prefix='val/')
 
             time0 = time.time()
             idx = what_train_to_log % len(ray_samplers)
@@ -539,7 +566,7 @@ def ddp_train_nerf(rank, args):
             dt = time.time() - time0
             if rank == 0:   # only main process should do this
                 logger.info('Logged a random training view in {} seconds'.format(dt))
-                log_view_to_tb(writer, global_step, log_data, gt_img=ray_samplers[idx].get_img(), mask=None, prefix='train/')
+                log_view_to_tb(writer, global_step, log_data, gt_img=ray_samplers[idx].get_img(), A=ray_samplers[idx].get_air_light(), mask=None, prefix='train/')
 
             del log_data
             torch.cuda.empty_cache()
@@ -570,7 +597,7 @@ def config_parser():
 
     parser.add_argument("--datadir", type=str, default="./data/carla_data/hazy", help='input data directory')
     parser.add_argument("--scene", type=str, default="9actors", help='scene name')
-    parser.add_argument("--expname", type=str, default="dcp_nerf_test", help='experiment name')
+    parser.add_argument("--expname", type=str, default="dcp_nerf_2", help='experiment name')
 
     parser.add_argument("--basedir", type=str, default='./logs/', help='where to store ckpts and logs')
     parser.add_argument("--config", type=str, default=None, help='config file path')
