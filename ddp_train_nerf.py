@@ -490,7 +490,10 @@ def ddp_train_nerf(rank, args):
                 loss = rgb_loss + args.lambda_autoexpo * (torch.abs(scale-1.)+torch.abs(shift))
             else:
                 rgb_loss = img2mse(ret['rgb'], rgb_gt)
-                data_loss = 0.0001 * img2mse(ret['trans_map'], coarse_t_gt)
+                #################################################
+                ### change the weight of the data_loss to 1 #####
+                #################################################
+                data_loss = img2mse(ret['trans_map'], coarse_t_gt)
                 # TODO: add a smooth loss term
                 # start implement smooth loss
                 # smooth loss E1 = t.T @ L @ t
@@ -525,7 +528,8 @@ def ddp_train_nerf(rank, args):
             scalars_to_log['level_{}/pnsr'.format(m)] = mse2psnr(rgb_loss.item())
 
             # add the plot of beta
-            scalars_to_log['level_{}/beta'.format(m)] = net.module.nerf_net.beta.item()
+            scalars_to_log['level_{}/fg_beta'.format(m)] = net.module.nerf_net.fg_beta.item()
+            scalars_to_log['level_{}/bg_beta'.format(m)] = net.module.nerf_net.bg_beta.item()
 
             loss.backward()
             optim.step()
@@ -597,7 +601,7 @@ def config_parser():
 
     parser.add_argument("--datadir", type=str, default="./data/carla_data/hazy", help='input data directory')
     parser.add_argument("--scene", type=str, default="9actors", help='scene name')
-    parser.add_argument("--expname", type=str, default="dcp_nerf_2", help='experiment name')
+    parser.add_argument("--expname", type=str, default="dcp_nerf_2beta", help='experiment name')
 
     parser.add_argument("--basedir", type=str, default='./logs/', help='where to store ckpts and logs')
     parser.add_argument("--config", type=str, default=None, help='config file path')

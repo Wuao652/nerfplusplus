@@ -72,9 +72,16 @@ class NerfNet(nn.Module):
                              use_viewdirs=args.use_viewdirs)
 
         # scattering parameter
-        self.beta = nn.Parameter(
+        ###############################
+        #### use 2 beta parameters ####
+        ###############################
+        self.fg_beta = nn.Parameter(
             torch.rand(1)
         )
+        self.bg_beta = nn.Parameter(
+            torch.rand(1)
+        )
+
 
     def forward(self, ray_o, ray_d, fg_z_max, fg_z_vals, bg_z_vals):
         '''
@@ -130,8 +137,8 @@ class NerfNet(nn.Module):
         T = torch.cat((torch.ones_like(T[..., 0:1]), T), dim=-1)  # [..., N_samples]
         bg_weights = bg_alpha * T  # [..., N_samples]
         bg_rgb_map = torch.sum(bg_weights.unsqueeze(-1) * bg_raw['rgb'], dim=-2)  # [..., 3]
-        # bg_depth_map = torch.sum(bg_weights * bg_z_vals, dim=-1)  # [...,]
-        bg_depth_map = torch.sum(bg_weights * torch.flip(_, dims=[-1, ]), dim=-1)   # [...,]
+        bg_depth_map = torch.sum(bg_weights * bg_z_vals, dim=-1)  # [...,]
+        # bg_depth_map = torch.sum(bg_weights * torch.flip(_, dims=[-1, ]), dim=-1)   # [...,]
 
         # composite foreground and background
         bg_rgb_map = bg_lambda.unsqueeze(-1) * bg_rgb_map
@@ -139,7 +146,14 @@ class NerfNet(nn.Module):
         rgb_map = fg_rgb_map + bg_rgb_map   # [512, 3]
 
         depth_map = fg_depth_map + bg_depth_map
-        trans_map = torch.exp(-1. * torch.abs(self.beta) * depth_map)
+
+        fg_depth_mat = fg_depth_map.detach()
+        fg_trans_map = torch.exp(-1. * torch.abs(self.fg_beta) * fg_depth_mat)
+        bg_depth_mat = bg_depth_map.detach()
+        bg_trans_map = torch.exp(-1. * torch.abs(self.bg_beta) * bg_depth_mat)
+
+        trans_map = torch.clamp(fg_trans_map + bg_trans_map - 1.0, 0.0, 1.0)
+
         ret = OrderedDict([('rgb', rgb_map),            # loss
                            ('fg_weights', fg_weights),  # importance sampling
                            ('bg_weights', bg_weights),  # importance sampling
