@@ -59,22 +59,6 @@ class NerfNet(nn.Module):
                              input_ch=self.fg_embedder_position.out_dim,
                              input_ch_viewdirs=self.fg_embedder_viewdir.out_dim,
                              use_viewdirs=args.use_viewdirs)
-        # background; bg_pt is (x, y, z, 1/r)
-        self.bg_embedder_position = Embedder(input_dim=4,
-                                             max_freq_log2=args.max_freq_log2 - 1,
-                                             N_freqs=args.max_freq_log2)
-        self.bg_embedder_viewdir = Embedder(input_dim=3,
-                                            max_freq_log2=args.max_freq_log2_viewdirs - 1,
-                                            N_freqs=args.max_freq_log2_viewdirs)
-        self.bg_net = MLPNet(D=args.netdepth, W=args.netwidth,
-                             input_ch=self.bg_embedder_position.out_dim,
-                             input_ch_viewdirs=self.bg_embedder_viewdir.out_dim,
-                             use_viewdirs=args.use_viewdirs)
-
-        # scattering parameter
-        self.beta = nn.Parameter(
-            torch.rand(1)
-        )
 
     def forward(self, ray_o, ray_d, fg_z_max, fg_z_vals, bg_z_vals):
         '''
@@ -109,48 +93,9 @@ class NerfNet(nn.Module):
         fg_rgb_map = torch.sum(fg_weights.unsqueeze(-1) * fg_raw['rgb'], dim=-2)  # [..., 3]
         fg_depth_map = torch.sum(fg_weights * fg_z_vals, dim=-1)     # [...,]
 
-        # render background
-        N_samples = bg_z_vals.shape[-1]
-        bg_ray_o = ray_o.unsqueeze(-2).expand(dots_sh + [N_samples, 3])
-        bg_ray_d = ray_d.unsqueeze(-2).expand(dots_sh + [N_samples, 3])
-        bg_viewdirs = viewdirs.unsqueeze(-2).expand(dots_sh + [N_samples, 3])
-        bg_pts, _ = depth2pts_outside(bg_ray_o, bg_ray_d, bg_z_vals)  # [..., N_samples, 4]
-        input = torch.cat((self.bg_embedder_position(bg_pts),
-                           self.bg_embedder_viewdir(bg_viewdirs)), dim=-1)
-        # near_depth: physical far; far_depth: physical near
-        input = torch.flip(input, dims=[-2,])
-        bg_z_vals = torch.flip(bg_z_vals, dims=[-1,])           # 1--->0
-        bg_dists = bg_z_vals[..., :-1] - bg_z_vals[..., 1:]
-        bg_dists = torch.cat((bg_dists, HUGE_NUMBER * torch.ones_like(bg_dists[..., 0:1])), dim=-1)  # [..., N_samples]
-        bg_raw = self.bg_net(input)
-        bg_alpha = 1. - torch.exp(-bg_raw['sigma'] * bg_dists)  # [..., N_samples]
-        # Eq. (3): T
-        # maths show weights, and summation of weights along a ray, are always inside [0, 1]
-        T = torch.cumprod(1. - bg_alpha + TINY_NUMBER, dim=-1)[..., :-1]  # [..., N_samples-1]
-        T = torch.cat((torch.ones_like(T[..., 0:1]), T), dim=-1)  # [..., N_samples]
-        bg_weights = bg_alpha * T  # [..., N_samples]
-        bg_rgb_map = torch.sum(bg_weights.unsqueeze(-1) * bg_raw['rgb'], dim=-2)  # [..., 3]
-        # bg_depth_map = torch.sum(bg_weights * bg_z_vals, dim=-1)  # [...,]
-        bg_depth_map = torch.sum(bg_weights * torch.flip(_, dims=[-1, ]), dim=-1)   # [...,]
-
-        # composite foreground and background
-        bg_rgb_map = bg_lambda.unsqueeze(-1) * bg_rgb_map
-        bg_depth_map = bg_lambda * bg_depth_map   # [512,]
-        rgb_map = fg_rgb_map + bg_rgb_map   # [512, 3]
-
-        depth_map = fg_depth_map + bg_depth_map
-        trans_map = torch.exp(-1. * torch.abs(self.beta) * depth_map)
-        ret = OrderedDict([('rgb', rgb_map),            # loss
+        ret = OrderedDict([('rgb', fg_rgb_map),            # loss
                            ('fg_weights', fg_weights),  # importance sampling
-                           ('bg_weights', bg_weights),  # importance sampling
-                           ('fg_rgb', fg_rgb_map),      # below are for logging
-                           ('fg_depth', fg_depth_map),
-                           ('bg_rgb', bg_rgb_map),
-                           ('bg_depth', bg_depth_map),
-                           ('bg_lambda', bg_lambda),
-                           # add by Wuao
-                           ('full_depth', depth_map),
-                           ('trans_map', trans_map)])
+                           ('depth', fg_depth_map)])
         return ret
 
 

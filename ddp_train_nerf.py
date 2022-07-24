@@ -163,10 +163,6 @@ def render_single_image(rank, world_size, models, ray_sampler, chunk_size):
                 step = (fg_far_depth - fg_near_depth) / (N_samples - 1)
                 fg_depth = torch.stack([fg_near_depth + i * step for i in range(N_samples)], dim=-1)  # [..., N_samples]
 
-                # background depth
-                bg_depth = torch.linspace(0., 1., N_samples).view(
-                    [1, ] * len(dots_sh) + [N_samples,]).expand(dots_sh + [N_samples,]).to(rank)
-
                 # delete unused memory
                 del fg_near_depth
                 del step
@@ -180,25 +176,14 @@ def render_single_image(rank, world_size, models, ray_sampler, chunk_size):
                                               N_samples=N_samples, det=True)    # [..., N_samples]
                 fg_depth, _ = torch.sort(torch.cat((fg_depth, fg_depth_samples), dim=-1))
 
-                # sample pdf and concat with earlier samples
-                bg_weights = ret['bg_weights'].clone().detach()
-                bg_depth_mid = .5 * (bg_depth[..., 1:] + bg_depth[..., :-1])
-                bg_weights = bg_weights[..., 1:-1]                              # [..., N_samples-2]
-                bg_depth_samples = sample_pdf(bins=bg_depth_mid, weights=bg_weights,
-                                              N_samples=N_samples, det=True)    # [..., N_samples]
-                bg_depth, _ = torch.sort(torch.cat((bg_depth, bg_depth_samples), dim=-1))
-
                 # delete unused memory
                 del fg_weights
                 del fg_depth_mid
                 del fg_depth_samples
-                del bg_weights
-                del bg_depth_mid
-                del bg_depth_samples
                 torch.cuda.empty_cache()
 
             with torch.no_grad():
-                ret = net(ray_o, ray_d, fg_far_depth, fg_depth, bg_depth)
+                ret = net(ray_o, ray_d, fg_far_depth, fg_depth, None)
 
             for key in ret:
                 if key not in ['fg_weights', 'bg_weights']:
@@ -247,51 +232,18 @@ def log_view_to_tb(writer, global_step, log_data, gt_img, A, mask, prefix=''):
     writer.add_image(prefix + 'rgb_gt', rgb_im, global_step)
 
     for m in range(len(log_data)):
+        # rgb
         rgb_im = img_HWC2CHW(log_data[m]['rgb'])
         rgb_im = torch.clamp(rgb_im, min=0., max=1.)  # just in case diffuse+specular>1
         writer.add_image(prefix + 'level_{}/rgb'.format(m), rgb_im, global_step)
 
-        rgb_im = img_HWC2CHW(log_data[m]['fg_rgb'])
-        rgb_im = torch.clamp(rgb_im, min=0., max=1.)  # just in case diffuse+specular>1
-        writer.add_image(prefix + 'level_{}/fg_rgb'.format(m), rgb_im, global_step)
-        depth = log_data[m]['fg_depth']
+        # depth
+        depth = log_data[m]['depth']
         depth_im = img_HWC2CHW(colorize(depth, cmap_name='jet', append_cbar=True,
                                         mask=mask))
-        writer.add_image(prefix + 'level_{}/fg_depth'.format(m), depth_im, global_step)
+        writer.add_image(prefix + 'level_{}/depth'.format(m), depth_im, global_step)
 
-        rgb_im = img_HWC2CHW(log_data[m]['bg_rgb'])
-        rgb_im = torch.clamp(rgb_im, min=0., max=1.)  # just in case diffuse+specular>1
-        writer.add_image(prefix + 'level_{}/bg_rgb'.format(m), rgb_im, global_step)
-        depth = log_data[m]['bg_depth']
-        depth_im = img_HWC2CHW(colorize(depth, cmap_name='jet', append_cbar=True,
-                                        mask=mask))
-        writer.add_image(prefix + 'level_{}/bg_depth'.format(m), depth_im, global_step)
-        bg_lambda = log_data[m]['bg_lambda']
-        bg_lambda_im = img_HWC2CHW(colorize(bg_lambda, cmap_name='hot', append_cbar=True,
-                                            mask=mask))
-        writer.add_image(prefix + 'level_{}/bg_lambda'.format(m), bg_lambda_im, global_step)
 
-    # torch version of get_radiance
-    def get_radiance(img, t, A):
-        H, W, C = img.shape
-        rep_A = A.unsqueeze(0).expand(H, W, C)
-        max_t = torch.maximum(0.1 * torch.ones_like(t), t)
-        radiance = (img - rep_A) / max_t.reshape((H, W, -1)) + rep_A
-        return radiance
-
-    gt_img = torch.from_numpy(gt_img)
-    air = torch.from_numpy(A)
-    # visualize the trans_map and clear_img
-    trans_im = log_data[-1]['trans_map']
-    clear_im = get_radiance(gt_img, trans_im, air)
-
-    trans_im = img_HWC2CHW(gray2rgb(trans_im))
-    trans_im = torch.clamp(trans_im, min=0., max=1.)
-    writer.add_image(prefix + 'trans_map', trans_im, global_step)
-
-    clear_im = img_HWC2CHW(clear_im)
-    clear_im = torch.clamp(clear_im, min=0., max=1.)  # just in case diffuse+specular>1
-    writer.add_image(prefix + 'clear_rgb', clear_im, global_step)
 
 
 def setup(rank, world_size):
@@ -437,7 +389,7 @@ def ddp_train_nerf(rank, args):
 
         # forward and backward
         dots_sh = list(ray_batch['ray_d'].shape[:-1])  # number of rays
-        all_rets = []                                  # results on different cascade levels
+        # all_rets = []                                  # results on different cascade levels
         for m in range(models['cascade_level']):
             optim = models['optim_{}'.format(m)]
             net = models['net_{}'.format(m)]
@@ -452,10 +404,6 @@ def ddp_train_nerf(rank, args):
                 fg_depth = torch.stack([fg_near_depth + i * step for i in range(N_samples)], dim=-1)  # [..., N_samples]
                 fg_depth = perturb_samples(fg_depth)   # random perturbation during training
 
-                # background depth
-                bg_depth = torch.linspace(0., 1., N_samples).view(
-                            [1, ] * len(dots_sh) + [N_samples,]).expand(dots_sh + [N_samples,]).to(rank)
-                bg_depth = perturb_samples(bg_depth)   # random perturbation during training
             else:
                 # sample pdf and concat with earlier samples
                 fg_weights = ret['fg_weights'].clone().detach()
@@ -465,17 +413,9 @@ def ddp_train_nerf(rank, args):
                                               N_samples=N_samples, det=False)    # [..., N_samples]
                 fg_depth, _ = torch.sort(torch.cat((fg_depth, fg_depth_samples), dim=-1))
 
-                # sample pdf and concat with earlier samples
-                bg_weights = ret['bg_weights'].clone().detach()
-                bg_depth_mid = .5 * (bg_depth[..., 1:] + bg_depth[..., :-1])
-                bg_weights = bg_weights[..., 1:-1]                              # [..., N_samples-2]
-                bg_depth_samples = sample_pdf(bins=bg_depth_mid, weights=bg_weights,
-                                              N_samples=N_samples, det=False)    # [..., N_samples]
-                bg_depth, _ = torch.sort(torch.cat((bg_depth, bg_depth_samples), dim=-1))
-
             optim.zero_grad()
-            ret = net(ray_batch['ray_o'], ray_batch['ray_d'], fg_far_depth, fg_depth, bg_depth, img_name=ray_batch['img_name'])
-            all_rets.append(ret)
+            ret = net(ray_batch['ray_o'], ray_batch['ray_d'], fg_far_depth, fg_depth, None, img_name=ray_batch['img_name'])
+            # all_rets.append(ret)
 
             rgb_gt = ray_batch['rgb'].to(rank)
             coarse_t_gt = ray_batch['coarse_t'].to(rank)
@@ -490,42 +430,9 @@ def ddp_train_nerf(rank, args):
                 loss = rgb_loss + args.lambda_autoexpo * (torch.abs(scale-1.)+torch.abs(shift))
             else:
                 rgb_loss = img2mse(ret['rgb'], rgb_gt)
-                data_loss = 0.0001 * img2mse(ret['trans_map'], coarse_t_gt)
-                # TODO: add a smooth loss term
-                # start implement smooth loss
-                # smooth loss E1 = t.T @ L @ t
-                ii = 0
-                M = len(ray_batch['num_pixel_in_patches'])
-                smooth_loss = 0.0
-                for jj in range(M):
-                    num_neigh = ray_batch['num_pixel_in_patches'][jj]
-                    start_idx, end_idx = ii, ii + num_neigh
-                    win_t = ret['trans_map'][start_idx:end_idx]   # [9, ]
-                    win_rgb = rgb_gt[start_idx:end_idx].to(torch.float32)
-                    # win_rgb = ret['rgb'][start_idx:end_idx]   # [9, 3]
-                    win_rgb_mean = torch.mean(win_rgb, dim=0, keepdim=True)
-                    win_rgb_var = torch.linalg.inv(
-                        (win_rgb.T @ win_rgb / num_neigh)
-                        - (win_rgb_mean.T @ win_rgb_mean)
-                        + (0.0000001 / num_neigh * torch.eye(3, device=win_rgb.device, dtype=win_rgb.dtype))
-                    )
-                    win_rgb_temp = win_rgb - win_rgb_mean.expand(num_neigh, 3)
-                    win_vals = -1. * (1. + win_rgb_temp @ win_rgb_var @ win_rgb_temp.T) / num_neigh \
-                               + torch.eye(num_neigh, device=win_rgb.device, dtype=win_rgb.dtype)
-                    temp_loss = win_t.reshape(1, num_neigh) @ win_vals @ win_t.reshape(num_neigh, 1)
-                    smooth_loss += temp_loss.reshape(-1)
-                    ii += num_neigh
-
-                # end implement smooth loss
-                loss = rgb_loss + data_loss + smooth_loss / M
+                loss = rgb_loss
             scalars_to_log['level_{}/loss'.format(m)] = loss.item()
-            scalars_to_log['level_{}/rgb_loss'.format(m)] = rgb_loss.item()
-            scalars_to_log['level_{}/data_loss'.format(m)] = data_loss.item()
-            scalars_to_log['level_{}/smooth_loss'.format(m)] = smooth_loss.item() / M
             scalars_to_log['level_{}/pnsr'.format(m)] = mse2psnr(rgb_loss.item())
-
-            # add the plot of beta
-            scalars_to_log['level_{}/beta'.format(m)] = net.module.nerf_net.beta.item()
 
             loss.backward()
             optim.step()
@@ -597,7 +504,7 @@ def config_parser():
 
     parser.add_argument("--datadir", type=str, default="./data/carla_data/hazy", help='input data directory')
     parser.add_argument("--scene", type=str, default="9actors", help='scene name')
-    parser.add_argument("--expname", type=str, default="dcp_nerf_2", help='experiment name')
+    parser.add_argument("--expname", type=str, default="dcp_nerf_forground_only", help='experiment name')
 
     parser.add_argument("--basedir", type=str, default='./logs/', help='where to store ckpts and logs')
     parser.add_argument("--config", type=str, default=None, help='config file path')
@@ -609,7 +516,7 @@ def config_parser():
 
     ### TRAINING
     # parser.add_argument("--N_iters", type=int, default=250001, help='number of iterations')
-    parser.add_argument("--N_iters", type=int, default=250001, help='number of iterations')
+    parser.add_argument("--N_iters", type=int, default=4001, help='number of iterations')
     parser.add_argument("--N_rand", type=int, default=1024,
                         help='batch size (number of random rays per gradient step)')
     parser.add_argument("--lrate", type=float, default=5e-4, help='learning rate')
