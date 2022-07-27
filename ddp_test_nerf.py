@@ -16,7 +16,7 @@ import imageio
 from ddp_train_nerf import config_parser, setup_logger, setup, cleanup, render_single_image, create_nerf
 import logging
 from dcp_utils import gray2rgb, get_radiance
-
+import cv2
 logger = logging.getLogger(__package__)
 
 
@@ -77,38 +77,40 @@ def ddp_test_nerf(rank, args):
                 im = to8b(im)
                 imageio.imwrite(os.path.join(out_dir, fname), im)
 
-                trans_map = ret[-1]['trans_map'].numpy()
-                clear_im = get_radiance(ray_samplers[idx].get_img(), trans_map, ray_samplers[idx].get_air_light())
-                trans_map = gray2rgb(trans_map)
-                trans_map = to8b(trans_map)
-                imageio.imwrite(os.path.join(out_dir, 'trans_' + fname), trans_map)
+                # depth_img (cv2 save_img)
+                depth_img_32_bit = ret[-1]['depth'].numpy() * 100.
+                # normalize the image to (0, 255)
+                depth_img_8_bit = cv2.normalize(depth_img_32_bit, None, 255, 0, cv2.NORM_MINMAX, cv2.CV_8UC1)
+                depth_img_8_bit_color = cv2.applyColorMap(depth_img_8_bit, cv2.COLORMAP_JET)
+                cv2.imwrite(os.path.join(out_dir, 'full_depth_' + fname), depth_img_8_bit_color)
 
-                clear_im = to8b(clear_im)
-                imageio.imwrite(os.path.join(out_dir, 'clear_' + fname), clear_im)
-
-                # depth_map
-                depth = ret[-1]['full_depth'].numpy()
+                # depth_img (imageio save_img)
+                depth = ret[-1]['depth'].numpy()
                 depth = gray2rgb(depth)
                 depth = to8b(depth)
-                imageio.imwrite(os.path.join(out_dir, 'full_depth_' + fname), depth)
+                imageio.imwrite(os.path.join(out_dir, 'depth_' + fname), depth)
+
+                # trans_map = ret[-1]['trans_map'].numpy()
+                # clear_im = get_radiance(ray_samplers[idx].get_img(), trans_map, ray_samplers[idx].get_air_light())
+                # trans_map = gray2rgb(trans_map)
+                # trans_map = to8b(trans_map)
+                # imageio.imwrite(os.path.join(out_dir, 'trans_' + fname), trans_map)
+                #
+                # clear_im = to8b(clear_im)
+                # imageio.imwrite(os.path.join(out_dir, 'clear_' + fname), clear_im)
+
+                #####################################################################
+                #### add by wuao : image save example ###############################
+                #####################################################################
 
                 # im = ret[-1]['fg_rgb'].numpy()
                 # im = to8b(im)
                 # imageio.imwrite(os.path.join(out_dir, 'fg_' + fname), im)
-                #
-                # im = ret[-1]['bg_rgb'].numpy()
-                # im = to8b(im)
-                # imageio.imwrite(os.path.join(out_dir, 'bg_' + fname), im)
-                #
+
                 # im = ret[-1]['fg_depth'].numpy()
                 # im = colorize_np(im, cmap_name='jet', append_cbar=True)
                 # im = to8b(im)
                 # imageio.imwrite(os.path.join(out_dir, 'fg_depth_' + fname), im)
-                #
-                # im = ret[-1]['bg_depth'].numpy()
-                # im = colorize_np(im, cmap_name='jet', append_cbar=True)
-                # im = to8b(im)
-                # imageio.imwrite(os.path.join(out_dir, 'bg_depth_' + fname), im)
 
             torch.cuda.empty_cache()
 
