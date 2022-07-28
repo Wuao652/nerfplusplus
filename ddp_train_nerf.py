@@ -242,56 +242,85 @@ def render_single_image(rank, world_size, models, ray_sampler, chunk_size):
         return None
 
 
-def log_view_to_tb(writer, global_step, log_data, gt_img, A, mask, prefix=''):
+def log_view_to_tb(writer, global_step, log_data, gt_img, clear_gt_img, mask, prefix=''):
     rgb_im = img_HWC2CHW(torch.from_numpy(gt_img))
-    writer.add_image(prefix + 'rgb_gt', rgb_im, global_step)
+    writer.add_image(prefix + 'm/' + 'hazy_gt', rgb_im, global_step)
 
+    rgb_im = img_HWC2CHW(torch.from_numpy(clear_gt_img))
+    writer.add_image(prefix + 'm/' + 'clear_gt', rgb_im, global_step)
     for m in range(len(log_data)):
         rgb_im = img_HWC2CHW(log_data[m]['rgb'])
         rgb_im = torch.clamp(rgb_im, min=0., max=1.)  # just in case diffuse+specular>1
-        writer.add_image(prefix + 'level_{}/rgb'.format(m), rgb_im, global_step)
+        writer.add_image(prefix + 'level_{}/g/clear'.format(m), rgb_im, global_step) # clear img 1
+
+        rgb_im = img_HWC2CHW(log_data[m]['hazy'])
+        rgb_im = torch.clamp(rgb_im, min=0., max=1.)  # just in case diffuse+specular>1
+        writer.add_image(prefix + 'level_{}/g/hazy'.format(m), rgb_im, global_step) # hazy img 2
+
+        rgb_im = img_HWC2CHW(gray2rgb(log_data[m]['t']))
+        rgb_im = torch.clamp(rgb_im, min=0., max=1.)  # just in case diffuse+specular>1
+        writer.add_image(prefix + 'level_{}/g/t'.format(m), rgb_im, global_step) # transmission map 3
 
         rgb_im = img_HWC2CHW(log_data[m]['fg_rgb'])
         rgb_im = torch.clamp(rgb_im, min=0., max=1.)  # just in case diffuse+specular>1
-        writer.add_image(prefix + 'level_{}/fg_rgb'.format(m), rgb_im, global_step)
+        writer.add_image(prefix + 'level_{}/fg_clear'.format(m), rgb_im, global_step) # fg_clear img 1
+
+        rgb_im = img_HWC2CHW(log_data[m]['fg_hazy'])
+        rgb_im = torch.clamp(rgb_im, min=0., max=1.)  # just in case diffuse+specular>1
+        writer.add_image(prefix + 'level_{}/fg_hazy'.format(m), rgb_im, global_step)  # fg_hazy img 2
+
+        rgb_im = img_HWC2CHW(gray2rgb(log_data[m]['fg_t']))
+        rgb_im = torch.clamp(rgb_im, min=0., max=1.)  # just in case diffuse+specular>1
+        writer.add_image(prefix + 'level_{}/fg_t'.format(m), rgb_im, global_step)  # fg transmission img 3
+
         depth = log_data[m]['fg_depth']
         depth_im = img_HWC2CHW(colorize(depth, cmap_name='jet', append_cbar=True,
                                         mask=mask))
-        writer.add_image(prefix + 'level_{}/fg_depth'.format(m), depth_im, global_step)
+        writer.add_image(prefix + 'level_{}/h/fg_depth'.format(m), depth_im, global_step) # fg_depth img 4
 
         rgb_im = img_HWC2CHW(log_data[m]['bg_rgb'])
         rgb_im = torch.clamp(rgb_im, min=0., max=1.)  # just in case diffuse+specular>1
-        writer.add_image(prefix + 'level_{}/bg_rgb'.format(m), rgb_im, global_step)
+        writer.add_image(prefix + 'level_{}/bg_clear'.format(m), rgb_im, global_step) # bg_clear img 1
+
+        rgb_im = img_HWC2CHW(log_data[m]['bg_hazy'])
+        rgb_im = torch.clamp(rgb_im, min=0., max=1.)  # just in case diffuse+specular>1
+        writer.add_image(prefix + 'level_{}/bg_hazy'.format(m), rgb_im, global_step) # bg_hazy img 2
+
+        rgb_im = img_HWC2CHW(gray2rgb(log_data[m]['bg_t']))
+        rgb_im = torch.clamp(rgb_im, min=0., max=1.)  # just in case diffuse+specular>1
+        writer.add_image(prefix + 'level_{}/bg_t'.format(m), rgb_im, global_step)  # bg transmission img 3
+
         depth = log_data[m]['bg_depth']
         depth_im = img_HWC2CHW(colorize(depth, cmap_name='jet', append_cbar=True,
                                         mask=mask))
-        writer.add_image(prefix + 'level_{}/bg_depth'.format(m), depth_im, global_step)
+        writer.add_image(prefix + 'level_{}/h/bg_depth'.format(m), depth_im, global_step) # bg depth img 4
+
         bg_lambda = log_data[m]['bg_lambda']
         bg_lambda_im = img_HWC2CHW(colorize(bg_lambda, cmap_name='hot', append_cbar=True,
                                             mask=mask))
-        writer.add_image(prefix + 'level_{}/bg_lambda'.format(m), bg_lambda_im, global_step)
+        writer.add_image(prefix + 'level_{}/h/bg_lambda'.format(m), bg_lambda_im, global_step)
 
-    # torch version of get_radiance
-    def get_radiance(img, t, A):
-        H, W, C = img.shape
-        rep_A = A.unsqueeze(0).expand(H, W, C)
-        max_t = torch.maximum(0.1 * torch.ones_like(t), t)
-        radiance = (img - rep_A) / max_t.reshape((H, W, -1)) + rep_A
-        return radiance
-
-    gt_img = torch.from_numpy(gt_img)
-    air = torch.from_numpy(A)
-    # visualize the trans_map and clear_img
-    trans_im = log_data[-1]['trans_map']
-    clear_im = get_radiance(gt_img, trans_im, air)
-
-    trans_im = img_HWC2CHW(gray2rgb(trans_im))
-    trans_im = torch.clamp(trans_im, min=0., max=1.)
-    writer.add_image(prefix + 'trans_map', trans_im, global_step)
-
-    clear_im = img_HWC2CHW(clear_im)
-    clear_im = torch.clamp(clear_im, min=0., max=1.)  # just in case diffuse+specular>1
-    writer.add_image(prefix + 'clear_rgb', clear_im, global_step)
+    # # torch version of get_radiance
+    # def get_radiance(img, t, A):
+    #     H, W, C = img.shape
+    #     rep_A = A.unsqueeze(0).expand(H, W, C)
+    #     max_t = torch.maximum(0.1 * torch.ones_like(t), t)
+    #     radiance = (img - rep_A) / max_t.reshape((H, W, -1)) + rep_A
+    #     return radiance
+    #
+    # gt_img = torch.from_numpy(gt_img)
+    # air = torch.from_numpy(A)
+    # # visualize the trans_map and clear_img
+    # trans_im = log_data[-1]['trans_map']
+    # clear_im = get_radiance(gt_img, trans_im, air)
+    #
+    # trans_im = img_HWC2CHW(gray2rgb(trans_im))
+    # trans_im = torch.clamp(trans_im, min=0., max=1.)
+    # writer.add_image(prefix + 'trans_map', trans_im, global_step)
+    #
+    # clear_im = img_HWC2CHW(clear_im)
+    # clear_im = torch.clamp(clear_im, min=0., max=1.)  # just in case diffuse+specular>1
+    # writer.add_image(prefix + 'clear_rgb', clear_im, global_step)
 
 
 def setup(rank, world_size):
@@ -375,8 +404,8 @@ def ddp_train_nerf(rank, args):
     else:
         logger.info('setting batch size according to 12G gpu')
         # args.N_rand = 512
-        args.N_rand = 50
-        args.chunk_size = 1024
+        args.N_rand = 64
+        args.chunk_size = 512
 
     ###### Create log dir and copy the config file
     if rank == 0:
@@ -437,7 +466,6 @@ def ddp_train_nerf(rank, args):
 
         # forward and backward
         dots_sh = list(ray_batch['ray_d'].shape[:-1])  # number of rays
-        all_rets = []                                  # results on different cascade levels
         for m in range(models['cascade_level']):
             optim = models['optim_{}'.format(m)]
             net = models['net_{}'.format(m)]
@@ -475,10 +503,9 @@ def ddp_train_nerf(rank, args):
 
             optim.zero_grad()
             ret = net(ray_batch['ray_o'], ray_batch['ray_d'], fg_far_depth, fg_depth, bg_depth, img_name=ray_batch['img_name'])
-            all_rets.append(ret)
 
-            rgb_gt = ray_batch['rgb'].to(rank)
-            coarse_t_gt = ray_batch['coarse_t'].to(rank)
+            rgb_hazy_gt = ray_batch['rgb'].to(rank)
+            rgb_clear_gt = ray_batch['rgb_clear'].to(rank)
 
             if 'autoexpo' in ret:
                 scale, shift = ret['autoexpo']
@@ -489,47 +516,30 @@ def ddp_train_nerf(rank, args):
                 rgb_loss = img2mse(rgb_pred, rgb_gt)
                 loss = rgb_loss + args.lambda_autoexpo * (torch.abs(scale-1.)+torch.abs(shift))
             else:
-                rgb_loss = img2mse(ret['rgb'], rgb_gt)
-                #################################################
-                ### change the weight of the data_loss to 1 #####
-                #################################################
-                data_loss = img2mse(ret['trans_map'], coarse_t_gt)
-                # TODO: add a smooth loss term
-                # start implement smooth loss
-                # smooth loss E1 = t.T @ L @ t
-                ii = 0
-                M = len(ray_batch['num_pixel_in_patches'])
-                smooth_loss = 0.0
-                for jj in range(M):
-                    num_neigh = ray_batch['num_pixel_in_patches'][jj]
-                    start_idx, end_idx = ii, ii + num_neigh
-                    win_t = ret['trans_map'][start_idx:end_idx]   # [9, ]
-                    win_rgb = rgb_gt[start_idx:end_idx].to(torch.float32)
-                    # win_rgb = ret['rgb'][start_idx:end_idx]   # [9, 3]
-                    win_rgb_mean = torch.mean(win_rgb, dim=0, keepdim=True)
-                    win_rgb_var = torch.linalg.inv(
-                        (win_rgb.T @ win_rgb / num_neigh)
-                        - (win_rgb_mean.T @ win_rgb_mean)
-                        + (0.0000001 / num_neigh * torch.eye(3, device=win_rgb.device, dtype=win_rgb.dtype))
-                    )
-                    win_rgb_temp = win_rgb - win_rgb_mean.expand(num_neigh, 3)
-                    win_vals = -1. * (1. + win_rgb_temp @ win_rgb_var @ win_rgb_temp.T) / num_neigh \
-                               + torch.eye(num_neigh, device=win_rgb.device, dtype=win_rgb.dtype)
-                    temp_loss = win_t.reshape(1, num_neigh) @ win_vals @ win_t.reshape(num_neigh, 1)
-                    smooth_loss += temp_loss.reshape(-1)
-                    ii += num_neigh
+                # ==========================
+                # use a different loss here
+                # ==========================
+                rgb_hazy_loss = img2mse(ret['hazy'], rgb_hazy_gt)
+                rgb_clear_loss = img2mse(ret['rgb'], rgb_clear_gt)
+                loss = rgb_hazy_loss + rgb_clear_loss
 
-                # end implement smooth loss
-                loss = rgb_loss + data_loss + smooth_loss / M
+            scalars_to_log['level_{}/rgb_hazy_loss'.format(m)] = rgb_hazy_loss.item()
+            scalars_to_log['level_{}/rgb_clear_loss'.format(m)] = rgb_clear_loss.item()
             scalars_to_log['level_{}/loss'.format(m)] = loss.item()
-            scalars_to_log['level_{}/rgb_loss'.format(m)] = rgb_loss.item()
-            scalars_to_log['level_{}/data_loss'.format(m)] = data_loss.item()
-            scalars_to_log['level_{}/smooth_loss'.format(m)] = smooth_loss.item() / M
-            scalars_to_log['level_{}/pnsr'.format(m)] = mse2psnr(rgb_loss.item())
+            scalars_to_log['level_{}/pnsr_hazy'.format(m)] = mse2psnr(rgb_hazy_loss.item())
+            scalars_to_log['level_{}/pnsr_clear'.format(m)] = mse2psnr(rgb_clear_loss.item())
 
             # add the plot of beta
             scalars_to_log['level_{}/fg_beta'.format(m)] = net.module.nerf_net.fg_beta.item()
             scalars_to_log['level_{}/bg_beta'.format(m)] = net.module.nerf_net.bg_beta.item()
+
+            scalars_to_log['level_{}/fg_airlight_r'.format(m)] = net.module.nerf_net.fg_airlight[0].item()
+            scalars_to_log['level_{}/fg_airlight_g'.format(m)] = net.module.nerf_net.fg_airlight[1].item()
+            scalars_to_log['level_{}/fg_airlight_b'.format(m)] = net.module.nerf_net.fg_airlight[2].item()
+
+            scalars_to_log['level_{}/bg_airlight_r'.format(m)] = net.module.nerf_net.bg_airlight[0].item()
+            scalars_to_log['level_{}/bg_airlight_g'.format(m)] = net.module.nerf_net.bg_airlight[1].item()
+            scalars_to_log['level_{}/bg_airlight_b'.format(m)] = net.module.nerf_net.bg_airlight[2].item()
 
             loss.backward()
             optim.step()
@@ -561,7 +571,7 @@ def ddp_train_nerf(rank, args):
             dt = time.time() - time0
             if rank == 0:    # only main process should do this
                 logger.info('Logged a random validation view in {} seconds'.format(dt))
-                log_view_to_tb(writer, global_step, log_data, gt_img=val_ray_samplers[idx].get_img(), A=val_ray_samplers[idx].get_air_light(), mask=None, prefix='val/')
+                log_view_to_tb(writer, global_step, log_data, gt_img=val_ray_samplers[idx].get_img(), clear_gt_img=val_ray_samplers[idx].get_clear_img(), mask=None, prefix='val/')
 
             time0 = time.time()
             idx = what_train_to_log % len(ray_samplers)
@@ -570,7 +580,7 @@ def ddp_train_nerf(rank, args):
             dt = time.time() - time0
             if rank == 0:   # only main process should do this
                 logger.info('Logged a random training view in {} seconds'.format(dt))
-                log_view_to_tb(writer, global_step, log_data, gt_img=ray_samplers[idx].get_img(), A=ray_samplers[idx].get_air_light(), mask=None, prefix='train/')
+                log_view_to_tb(writer, global_step, log_data, gt_img=ray_samplers[idx].get_img(), clear_gt_img=ray_samplers[idx].get_clear_img(), mask=None, prefix='train/')
 
             del log_data
             torch.cuda.empty_cache()
