@@ -46,25 +46,16 @@ def load_data_split(basedir, scene, split, skip=1, try_load_min_depth=True, only
     else:
         img_files = [None, ] * cam_cnt
 
-    a_files = find_files(
-        os.path.join(basedir, scene + '_trans'),
-        exts=['*.txt']
-    )
-    if len(a_files) > 0:
-        a_files = a_files[::skip]
-        assert (len(a_files) == cam_cnt)
+    # clear img files
+    img_clear_files = find_files(
+        os.path.join(basedir.replace('hazy', 'gt'), scene),
+        exts=['*.png', '*.jpg'])
+    if len(img_clear_files) > 0:
+        # print(f"load {len(img_clear_files)} image files")
+        img_clear_files = img_clear_files[::skip]
+        assert (len(img_clear_files) == cam_cnt)
     else:
-        a_files = [None, ] * cam_cnt
-
-    t_files = find_files(
-        os.path.join(basedir, scene + '_trans'),
-        exts=['*.png', '*.jpg']
-    )
-    if len(t_files) > 0:
-        t_files = t_files[::skip]
-        assert (len(t_files) == cam_cnt)
-    else:
-        t_files = [None, ] * cam_cnt
+        img_clear_files = [None, ] * cam_cnt
 
     mask_files = [None, ] * cam_cnt
     mindepth_files = [None, ] * cam_cnt
@@ -90,24 +81,21 @@ def load_data_split(basedir, scene, split, skip=1, try_load_min_depth=True, only
 
     if split == 'train':
         img_files = [img_files[i] for i in train_idx]
-        a_files = [a_files[i] for i in train_idx]
-        t_files = [t_files[i] for i in train_idx]
+        img_clear_files = [img_clear_files[i] for i in train_idx]
         mask_files = [mask_files[i] for i in train_idx]
         mindepth_files = [mindepth_files[i] for i in train_idx]
         pose_files = pose_files[train_idx]
         cam_cnt = pose_files.shape[0]
     elif split == 'validation':
         img_files = [img_files[i] for i in validate_idx]
-        a_files = [a_files[i] for i in validate_idx]
-        t_files = [t_files[i] for i in validate_idx]
+        img_clear_files = [img_clear_files[i] for i in validate_idx]
         mask_files = [mask_files[i] for i in validate_idx]
         mindepth_files = [mindepth_files[i] for i in validate_idx]
         pose_files = pose_files[validate_idx]
         cam_cnt = pose_files.shape[0]
     elif split == 'test':
         img_files = [img_files[i] for i in test_idx]
-        a_files = [a_files[i] for i in test_idx]
-        t_files = [t_files[i] for i in test_idx]
+        img_clear_files = [img_clear_files[i] for i in test_idx]
         mask_files = [mask_files[i] for i in test_idx]
         mindepth_files = [mindepth_files[i] for i in test_idx]
         pose_files = pose_files[test_idx]
@@ -119,8 +107,7 @@ def load_data_split(basedir, scene, split, skip=1, try_load_min_depth=True, only
 
     print(f"Dataloader Type : {split}")
     print(f"Number of img files : {len(img_files)}")
-    print(f"Number of coarse_t files : {len(t_files)}")
-    print(f"Number of air_light files : {len(a_files)}")
+    print(f"Number of img_clear files : {len(img_clear_files)}")
     print(f"Number of pose files : {pose_files.shape}")
     print(f"Image size : {H} * {W}")
     print(f"Preprocess facter : {scale_factor}")
@@ -136,8 +123,7 @@ def load_data_split(basedir, scene, split, skip=1, try_load_min_depth=True, only
 
         ray_samplers.append(RaySamplerSingleImage(H=H, W=W, intrinsics=intrinsics, c2w=pose,
                                                   img_path=img_files[i],
-                                                  a_path=a_files[i],
-                                                  t_path=t_files[i],
+                                                  img_clear_path=img_clear_files[i],
                                                   mask_path=mask_files[i],
                                                   min_depth_path=mindepth_files[i],
                                                   max_depth=max_depth))
