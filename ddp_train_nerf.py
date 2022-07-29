@@ -300,6 +300,11 @@ def log_view_to_tb(writer, global_step, log_data, gt_img, clear_gt_img, mask, pr
                                             mask=mask))
         writer.add_image(prefix + 'level_{}/h/bg_lambda'.format(m), bg_lambda_im, global_step)
 
+        depth = log_data[m]['depth']
+        depth_im = img_HWC2CHW(colorize(depth, cmap_name='jet', append_cbar=True,
+                                        mask=mask))
+        writer.add_image(prefix + 'n/' + 'level_{}/full_depth'.format(m), depth_im, global_step) # full depth img
+
     # # torch version of get_radiance
     # def get_radiance(img, t, A):
     #     H, W, C = img.shape

@@ -76,17 +76,17 @@ class NerfNet(nn.Module):
         #### use 2 beta parameters ####
         ###############################
         self.fg_beta = nn.Parameter(
-            torch.randn(1)
+            torch.rand(1)
         )
         self.bg_beta = nn.Parameter(
-            torch.randn(1)
+            torch.rand(1)
         )
 
         self.fg_airlight = nn.Parameter(
-            torch.randn(3)
+            torch.rand(3)
         )
         self.bg_airlight = nn.Parameter(
-            torch.randn(3)
+            torch.rand(3)
         )
 
     def forward(self, ray_o, ray_d, fg_z_max, fg_z_vals, bg_z_vals):
@@ -170,6 +170,7 @@ class NerfNet(nn.Module):
         bg_rgb_map = bg_lambda.unsqueeze(-1) * bg_rgb_map
         bg_depth_map = bg_lambda * bg_depth_map   # [512,]
         rgb_map = fg_rgb_map + bg_rgb_map   # [512, 3]
+        depth_map = fg_depth_map + bg_depth_map
 
         # =========================================
         # composite hazy foreground and background
@@ -182,6 +183,7 @@ class NerfNet(nn.Module):
         ret = OrderedDict([('rgb', rgb_map),            # loss
                            ('hazy', hazy_map),          # hazy image
                            ('t', trans_map),            # transmission map
+                           ('depth', depth_map),        # full depth map
                            ('fg_weights', fg_weights),  # importance sampling
                            ('bg_weights', bg_weights),  # importance sampling
                            ('fg_rgb', fg_rgb_map),      # below are for logging
