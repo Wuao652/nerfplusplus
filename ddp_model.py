@@ -133,8 +133,11 @@ class NerfNet(nn.Module):
         # ======================================================
         # apply scattering physical model to generate hazy image
         # ======================================================
+        # fg_trans_map = torch.exp(-fg_beta * fg_depth_map).unsqueeze(-1)
+        # fg_hazy_map = fg_trans_map * fg_rgb_map + fg_airlight_rgb * (1. - fg_trans_map)
+        fg_inv_trans = torch.exp(fg_beta * fg_depth_map).unsqueeze(-1)
+        fg_dehazed_map = fg_inv_trans * fg_rgb_map - fg_inv_trans * fg_airlight_rgb + fg_airlight_rgb
         fg_trans_map = torch.exp(-fg_beta * fg_depth_map).unsqueeze(-1)
-        fg_hazy_map = fg_trans_map * fg_rgb_map + fg_airlight_rgb * (1. - fg_trans_map)
 
         # render background
         N_samples = bg_z_vals.shape[-1]
@@ -163,8 +166,11 @@ class NerfNet(nn.Module):
         # ======================================================
         # apply scattering physical model to generate hazy image
         # ======================================================
+        # bg_trans_map = torch.exp(-bg_beta * bg_depth_map).unsqueeze(-1)
+        # bg_hazy_map = bg_trans_map * bg_rgb_map + bg_airlight_rgb * (1. - bg_trans_map)
+        bg_inv_trans = torch.exp(bg_beta * bg_depth_map).unsqueeze(-1)
+        bg_dehazed_map = bg_inv_trans * bg_rgb_map - bg_inv_trans * bg_airlight_rgb + bg_airlight_rgb
         bg_trans_map = torch.exp(-bg_beta * bg_depth_map).unsqueeze(-1)
-        bg_hazy_map = bg_trans_map * bg_rgb_map + bg_airlight_rgb * (1. - bg_trans_map)
 
         # composite foreground and background
         bg_rgb_map = bg_lambda.unsqueeze(-1) * bg_rgb_map
@@ -176,23 +182,26 @@ class NerfNet(nn.Module):
         # composite hazy foreground and background
         # =========================================
 
-        bg_hazy_map = bg_lambda.unsqueeze(-1) * bg_hazy_map
-        hazy_map = fg_hazy_map + bg_hazy_map
+        # bg_hazy_map = bg_lambda.unsqueeze(-1) * bg_hazy_map
+        # hazy_map = fg_hazy_map + bg_hazy_map
+        bg_dehazed_map = bg_lambda.unsqueeze(-1) * bg_dehazed_map
+        dehazed_map = fg_dehazed_map + bg_dehazed_map
+
         trans_map = torch.clamp(fg_trans_map + bg_trans_map - 1., 0.0, 1.0)
 
-        ret = OrderedDict([('rgb', rgb_map),            # loss
-                           ('hazy', hazy_map),          # hazy image
+        ret = OrderedDict([('rgb', dehazed_map),            # loss
+                           ('hazy', rgb_map),          # hazy image
                            ('t', trans_map),            # transmission map
                            ('depth', depth_map),        # full depth map
                            ('fg_weights', fg_weights),  # importance sampling
                            ('bg_weights', bg_weights),  # importance sampling
-                           ('fg_rgb', fg_rgb_map),      # below are for logging
+                           ('fg_rgb', fg_dehazed_map),      # below are for logging
                            ('fg_depth', fg_depth_map),
-                           ('fg_hazy', fg_hazy_map),
+                           ('fg_hazy', fg_rgb_map),
                            ('fg_t', fg_trans_map),
-                           ('bg_rgb', bg_rgb_map),
+                           ('bg_rgb', bg_dehazed_map),
                            ('bg_depth', bg_depth_map),
-                           ('bg_hazy', bg_hazy_map),
+                           ('bg_hazy', bg_rgb_map),
                            ('bg_t', bg_trans_map),
                            ('bg_lambda', bg_lambda)])
         return ret
