@@ -244,66 +244,65 @@ def render_single_image(rank, world_size, models, ray_sampler, chunk_size):
 
 def log_view_to_tb(writer, global_step, log_data, gt_img, clear_gt_img, mask, prefix=''):
     rgb_im = img_HWC2CHW(torch.from_numpy(gt_img))
-    writer.add_image(prefix + 'm/' + 'hazy_gt', rgb_im, global_step)
-
+    writer.add_image(prefix + 'm/' + 'rgb_gt', rgb_im, global_step)
     rgb_im = img_HWC2CHW(torch.from_numpy(clear_gt_img))
-    writer.add_image(prefix + 'm/' + 'clear_gt', rgb_im, global_step)
+    writer.add_image(prefix + 'm/' + 'rgb_clear_gt', rgb_im, global_step)
     for m in range(len(log_data)):
         rgb_im = img_HWC2CHW(log_data[m]['rgb'])
         rgb_im = torch.clamp(rgb_im, min=0., max=1.)  # just in case diffuse+specular>1
-        writer.add_image(prefix + 'level_{}/g/clear'.format(m), rgb_im, global_step) # clear img 1
+        writer.add_image(prefix + 'level_{}/g/full_rgb'.format(m), rgb_im, global_step)   # full_hazy img 1
 
-        rgb_im = img_HWC2CHW(log_data[m]['hazy'])
+        rgb_im = img_HWC2CHW(log_data[m]['rgb_clear'])
         rgb_im = torch.clamp(rgb_im, min=0., max=1.)  # just in case diffuse+specular>1
-        writer.add_image(prefix + 'level_{}/g/hazy'.format(m), rgb_im, global_step) # hazy img 2
+        writer.add_image(prefix + 'level_{}/g/full_rgb_clear'.format(m), rgb_im, global_step)   # full_clear img 2
+
+        depth = log_data[m]['depth']
+        depth_im = img_HWC2CHW(colorize(depth, cmap_name='jet', append_cbar=True,
+                                        mask=mask))
+        writer.add_image(prefix + 'n/' + 'level_{}/full_depth'.format(m), depth_im, global_step)   # full_depth map 3
 
         rgb_im = img_HWC2CHW(gray2rgb(log_data[m]['t']))
         rgb_im = torch.clamp(rgb_im, min=0., max=1.)  # just in case diffuse+specular>1
-        writer.add_image(prefix + 'level_{}/g/t'.format(m), rgb_im, global_step) # transmission map 3
+        writer.add_image(prefix + 'level_{}/g/full_t'.format(m), rgb_im, global_step)   # full_transmission map 4
 
         rgb_im = img_HWC2CHW(log_data[m]['fg_rgb'])
         rgb_im = torch.clamp(rgb_im, min=0., max=1.)  # just in case diffuse+specular>1
-        writer.add_image(prefix + 'level_{}/fg_clear'.format(m), rgb_im, global_step) # fg_clear img 1
+        writer.add_image(prefix + 'level_{}/fg_rgb'.format(m), rgb_im, global_step)   # fg_hazy img 1
 
-        rgb_im = img_HWC2CHW(log_data[m]['fg_hazy'])
+        rgb_im = img_HWC2CHW(log_data[m]['fg_rgb_clear'])
         rgb_im = torch.clamp(rgb_im, min=0., max=1.)  # just in case diffuse+specular>1
-        writer.add_image(prefix + 'level_{}/fg_hazy'.format(m), rgb_im, global_step)  # fg_hazy img 2
-
-        rgb_im = img_HWC2CHW(gray2rgb(log_data[m]['fg_t']))
-        rgb_im = torch.clamp(rgb_im, min=0., max=1.)  # just in case diffuse+specular>1
-        writer.add_image(prefix + 'level_{}/fg_t'.format(m), rgb_im, global_step)  # fg transmission img 3
+        writer.add_image(prefix + 'level_{}/fg_rgb_clear'.format(m), rgb_im, global_step)  # fg_clear img 2
 
         depth = log_data[m]['fg_depth']
         depth_im = img_HWC2CHW(colorize(depth, cmap_name='jet', append_cbar=True,
                                         mask=mask))
-        writer.add_image(prefix + 'level_{}/h/fg_depth'.format(m), depth_im, global_step) # fg_depth img 4
+        writer.add_image(prefix + 'level_{}/h/fg_depth'.format(m), depth_im, global_step)   # fg_depth map 3
+
+        rgb_im = img_HWC2CHW(gray2rgb(log_data[m]['fg_t']))
+        rgb_im = torch.clamp(rgb_im, min=0., max=1.)  # just in case diffuse+specular>1
+        writer.add_image(prefix + 'level_{}/fg_t'.format(m), rgb_im, global_step)   # fg_transmission map 4
 
         rgb_im = img_HWC2CHW(log_data[m]['bg_rgb'])
         rgb_im = torch.clamp(rgb_im, min=0., max=1.)  # just in case diffuse+specular>1
-        writer.add_image(prefix + 'level_{}/bg_clear'.format(m), rgb_im, global_step) # bg_clear img 1
+        writer.add_image(prefix + 'level_{}/bg_rgb'.format(m), rgb_im, global_step)   # bg_hazy img 1
 
-        rgb_im = img_HWC2CHW(log_data[m]['bg_hazy'])
+        rgb_im = img_HWC2CHW(log_data[m]['bg_rgb_clear'])
         rgb_im = torch.clamp(rgb_im, min=0., max=1.)  # just in case diffuse+specular>1
-        writer.add_image(prefix + 'level_{}/bg_hazy'.format(m), rgb_im, global_step) # bg_hazy img 2
-
-        rgb_im = img_HWC2CHW(gray2rgb(log_data[m]['bg_t']))
-        rgb_im = torch.clamp(rgb_im, min=0., max=1.)  # just in case diffuse+specular>1
-        writer.add_image(prefix + 'level_{}/bg_t'.format(m), rgb_im, global_step)  # bg transmission img 3
+        writer.add_image(prefix + 'level_{}/bg_rgb_clear'.format(m), rgb_im, global_step)   # bg_clear img 2
 
         depth = log_data[m]['bg_depth']
         depth_im = img_HWC2CHW(colorize(depth, cmap_name='jet', append_cbar=True,
                                         mask=mask))
-        writer.add_image(prefix + 'level_{}/h/bg_depth'.format(m), depth_im, global_step) # bg depth img 4
+        writer.add_image(prefix + 'level_{}/h/bg_depth'.format(m), depth_im, global_step)   # bg_depth map 3
+
+        rgb_im = img_HWC2CHW(gray2rgb(log_data[m]['bg_t']))
+        rgb_im = torch.clamp(rgb_im, min=0., max=1.)  # just in case diffuse+specular>1
+        writer.add_image(prefix + 'level_{}/bg_t'.format(m), rgb_im, global_step)   # bg_transmission map 4
 
         bg_lambda = log_data[m]['bg_lambda']
         bg_lambda_im = img_HWC2CHW(colorize(bg_lambda, cmap_name='hot', append_cbar=True,
                                             mask=mask))
         writer.add_image(prefix + 'level_{}/h/bg_lambda'.format(m), bg_lambda_im, global_step)
-
-        depth = log_data[m]['depth']
-        depth_im = img_HWC2CHW(colorize(depth, cmap_name='jet', append_cbar=True,
-                                        mask=mask))
-        writer.add_image(prefix + 'n/' + 'level_{}/full_depth'.format(m), depth_im, global_step) # full depth img
 
     # # torch version of get_radiance
     # def get_radiance(img, t, A):
@@ -509,7 +508,7 @@ def ddp_train_nerf(rank, args):
             optim.zero_grad()
             ret = net(ray_batch['ray_o'], ray_batch['ray_d'], fg_far_depth, fg_depth, bg_depth, img_name=ray_batch['img_name'])
 
-            rgb_hazy_gt = ray_batch['rgb'].to(rank)
+            rgb_gt = ray_batch['rgb'].to(rank)
             rgb_clear_gt = ray_batch['rgb_clear'].to(rank)
 
             if 'autoexpo' in ret:
@@ -524,14 +523,14 @@ def ddp_train_nerf(rank, args):
                 # ==========================
                 # use a different loss here
                 # ==========================
-                rgb_hazy_loss = img2mse(ret['hazy'], rgb_hazy_gt)
-                rgb_clear_loss = img2mse(ret['rgb'], rgb_clear_gt)
-                loss = rgb_hazy_loss + rgb_clear_loss
+                rgb_loss = img2mse(ret['rgb'], rgb_gt)
+                rgb_clear_loss = img2mse(ret['rgb_clear'], rgb_clear_gt)
+                loss = rgb_loss + rgb_clear_loss
 
-            scalars_to_log['level_{}/rgb_hazy_loss'.format(m)] = rgb_hazy_loss.item()
+            scalars_to_log['level_{}/rgb_loss'.format(m)] = rgb_loss.item()
             scalars_to_log['level_{}/rgb_clear_loss'.format(m)] = rgb_clear_loss.item()
             scalars_to_log['level_{}/loss'.format(m)] = loss.item()
-            scalars_to_log['level_{}/pnsr_hazy'.format(m)] = mse2psnr(rgb_hazy_loss.item())
+            scalars_to_log['level_{}/pnsr'.format(m)] = mse2psnr(rgb_loss.item())
             scalars_to_log['level_{}/pnsr_clear'.format(m)] = mse2psnr(rgb_clear_loss.item())
 
             # add the plot of beta
