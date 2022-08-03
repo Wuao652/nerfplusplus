@@ -152,6 +152,7 @@ def load_data_split(basedir, scene, split, skip=1, try_load_min_depth=True, only
                                                   img_path=img_files[i],
                                                   a_path=a_files[i],
                                                   t_path=t_files[i],
+                                                  d_path=d_files[i],
                                                   mask_path=mask_files[i],
                                                   min_depth_path=mindepth_files[i],
                                                   max_depth=max_depth))
