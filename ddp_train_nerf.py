@@ -150,6 +150,7 @@ def render_single_image(rank, world_size, models, ray_sampler, chunk_size):
         ray_o = ray_batch_split['ray_o'][s]
         ray_d = ray_batch_split['ray_d'][s]
         min_depth = ray_batch_split['min_depth'][s]
+        gt_depth = ray_batch_split['gt_depth'][s]
 
         dots_sh = list(ray_d.shape[:-1])
         for m in range(models['cascade_level']):
@@ -198,7 +199,7 @@ def render_single_image(rank, world_size, models, ray_sampler, chunk_size):
                 torch.cuda.empty_cache()
 
             with torch.no_grad():
-                ret = net(ray_o, ray_d, fg_far_depth, fg_depth, bg_depth)
+                ret = net(ray_o, ray_d, fg_far_depth, fg_depth, bg_depth, img_name=None, gt_depth=gt_depth)
 
             for key in ret:
                 if key not in ['fg_weights', 'bg_weights']:
@@ -250,6 +251,11 @@ def log_view_to_tb(writer, global_step, log_data, gt_img, A, mask, prefix=''):
         rgb_im = img_HWC2CHW(log_data[m]['rgb'])
         rgb_im = torch.clamp(rgb_im, min=0., max=1.)  # just in case diffuse+specular>1
         writer.add_image(prefix + 'level_{}/rgb'.format(m), rgb_im, global_step)
+
+        depth = log_data[m]['depth_map']
+        depth_im = img_HWC2CHW(colorize(depth, cmap_name='jet', append_cbar=True,
+                                        mask=mask))
+        writer.add_image(prefix + 'level_{}/depth_map'.format(m), depth_im, global_step)
 
         rgb_im = img_HWC2CHW(log_data[m]['fg_rgb'])
         rgb_im = torch.clamp(rgb_im, min=0., max=1.)  # just in case diffuse+specular>1
@@ -437,7 +443,6 @@ def ddp_train_nerf(rank, args):
 
         # forward and backward
         dots_sh = list(ray_batch['ray_d'].shape[:-1])  # number of rays
-        all_rets = []                                  # results on different cascade levels
         for m in range(models['cascade_level']):
             optim = models['optim_{}'.format(m)]
             net = models['net_{}'.format(m)]
@@ -474,8 +479,7 @@ def ddp_train_nerf(rank, args):
                 bg_depth, _ = torch.sort(torch.cat((bg_depth, bg_depth_samples), dim=-1))
 
             optim.zero_grad()
-            ret = net(ray_batch['ray_o'], ray_batch['ray_d'], fg_far_depth, fg_depth, bg_depth, img_name=ray_batch['img_name'])
-            all_rets.append(ret)
+            ret = net(ray_batch['ray_o'], ray_batch['ray_d'], fg_far_depth, fg_depth, bg_depth, img_name=ray_batch['img_name'], gt_depth=ray_batch['gt_depth'])
 
             rgb_gt = ray_batch['rgb'].to(rank)
             coarse_t_gt = ray_batch['coarse_t'].to(rank)
@@ -528,8 +532,7 @@ def ddp_train_nerf(rank, args):
             scalars_to_log['level_{}/pnsr'.format(m)] = mse2psnr(rgb_loss.item())
 
             # add the plot of beta
-            scalars_to_log['level_{}/fg_beta'.format(m)] = net.module.nerf_net.fg_beta.item()
-            scalars_to_log['level_{}/bg_beta'.format(m)] = net.module.nerf_net.bg_beta.item()
+            scalars_to_log['level_{}/beta'.format(m)] = net.module.nerf_net.beta.item()
 
             loss.backward()
             optim.step()
@@ -601,7 +604,7 @@ def config_parser():
 
     parser.add_argument("--datadir", type=str, default="./data/carla_data/hazy", help='input data directory')
     parser.add_argument("--scene", type=str, default="9actors", help='scene name')
-    parser.add_argument("--expname", type=str, default="dcp_nerf_2beta", help='experiment name')
+    parser.add_argument("--expname", type=str, default="gt_test", help='experiment name')
 
     parser.add_argument("--basedir", type=str, default='./logs/', help='where to store ckpts and logs')
     parser.add_argument("--config", type=str, default=None, help='config file path')
@@ -613,7 +616,7 @@ def config_parser():
 
     ### TRAINING
     # parser.add_argument("--N_iters", type=int, default=250001, help='number of iterations')
-    parser.add_argument("--N_iters", type=int, default=250001, help='number of iterations')
+    parser.add_argument("--N_iters", type=int, default=50001, help='number of iterations')
     parser.add_argument("--N_rand", type=int, default=1024,
                         help='batch size (number of random rays per gradient step)')
     parser.add_argument("--lrate", type=float, default=5e-4, help='learning rate')

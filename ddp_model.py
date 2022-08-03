@@ -72,18 +72,15 @@ class NerfNet(nn.Module):
                              use_viewdirs=args.use_viewdirs)
 
         # scattering parameter
-        ###############################
-        #### use 2 beta parameters ####
-        ###############################
-        self.fg_beta = nn.Parameter(
-            torch.rand(1)
-        )
-        self.bg_beta = nn.Parameter(
+        ######################################
+        #### use only 1 beta parameter    ####
+        ######################################
+        self.beta = nn.Parameter(
             torch.rand(1)
         )
 
 
-    def forward(self, ray_o, ray_d, fg_z_max, fg_z_vals, bg_z_vals):
+    def forward(self, ray_o, ray_d, fg_z_max, fg_z_vals, bg_z_vals, gt_depth=None):
         '''
         :param ray_o, ray_d: [..., 3]
         :param fg_z_max: [...,]
@@ -94,6 +91,11 @@ class NerfNet(nn.Module):
         ray_d_norm = torch.norm(ray_d, dim=-1, keepdim=True)  # [..., 1]
         viewdirs = ray_d / ray_d_norm      # [..., 3]
         dots_sh = list(ray_d.shape[:-1])
+
+        # ===============================================
+        # create tensor for parameter beta and air light
+        # ===============================================
+        beta = self.beta
 
         ######### render foreground
         N_samples = fg_z_vals.shape[-1]
@@ -146,13 +148,7 @@ class NerfNet(nn.Module):
         rgb_map = fg_rgb_map + bg_rgb_map   # [512, 3]
 
         depth_map = fg_depth_map + bg_depth_map
-
-        fg_depth_mat = fg_depth_map.detach()
-        fg_trans_map = torch.exp(-1. * torch.abs(self.fg_beta) * fg_depth_mat)
-        bg_depth_mat = bg_depth_map.detach()
-        bg_trans_map = torch.exp(-1. * torch.abs(self.bg_beta) * bg_depth_mat)
-
-        trans_map = torch.clamp(fg_trans_map + bg_trans_map - 1.0, 0.0, 1.0)
+        trans_map = torch.exp(-beta * gt_depth)
 
         ret = OrderedDict([('rgb', rgb_map),            # loss
                            ('fg_weights', fg_weights),  # importance sampling
@@ -163,7 +159,7 @@ class NerfNet(nn.Module):
                            ('bg_depth', bg_depth_map),
                            ('bg_lambda', bg_lambda),
                            # add by Wuao
-                           ('full_depth', depth_map),
+                           ('depth_map', depth_map),
                            ('trans_map', trans_map)])
         return ret
 
@@ -193,14 +189,14 @@ class NerfNetWithAutoExpo(nn.Module):
             logger.info('\n'.join(self.img_names))
             self.autoexpo_params = nn.ParameterDict(OrderedDict([(x, nn.Parameter(torch.Tensor([0.5, 0.]))) for x in self.img_names]))
 
-    def forward(self, ray_o, ray_d, fg_z_max, fg_z_vals, bg_z_vals, img_name=None):
+    def forward(self, ray_o, ray_d, fg_z_max, fg_z_vals, bg_z_vals, img_name=None, gt_depth=None):
         '''
         :param ray_o, ray_d: [..., 3]
         :param fg_z_max: [...,]
         :param fg_z_vals, bg_z_vals: [..., N_samples]
         :return
         '''
-        ret = self.nerf_net(ray_o, ray_d, fg_z_max, fg_z_vals, bg_z_vals)
+        ret = self.nerf_net(ray_o, ray_d, fg_z_max, fg_z_vals, bg_z_vals, gt_depth)
 
         if img_name is not None:
             img_name = remap_name(img_name)

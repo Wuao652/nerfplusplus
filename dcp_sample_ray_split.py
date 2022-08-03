@@ -104,7 +104,7 @@ class RaySamplerSingleImage(object):
 
             # load the ground truth depth map [H, W]
             if self.d_path is not None:
-                self.gt_depth = np.load(self.d_path).astype(np.float32) / 1000.
+                self.gt_depth = np.load(self.d_path).astype(np.float32)
                 self.gt_depth = self.gt_depth.reshape(-1)
             else:
                 self.gt_depth = None
