@@ -51,6 +51,7 @@ class RaySamplerSingleImage(object):
                        img_path=None,
                        a_path=None,
                        t_path=None,
+                       d_path=None,
                        resolution_level=1,
                        mask_path=None,
                        min_depth_path=None,
@@ -64,6 +65,7 @@ class RaySamplerSingleImage(object):
         self.img_path = img_path
         self.a_path = a_path
         self.t_path = t_path
+        self.d_path = d_path
         self.mask_path = mask_path
         self.min_depth_path = min_depth_path
         self.max_depth = max_depth
@@ -80,7 +82,7 @@ class RaySamplerSingleImage(object):
             self.intrinsics[:2, :3] /= resolution_level
             # only load image at this time
             if self.img_path is not None:
-                self.img = imageio.imread(self.img_path).astype(np.float64) / 255.
+                self.img = imageio.imread(self.img_path).astype(np.float32) / 255.
                 self.img = cv2.resize(self.img, (self.W, self.H), interpolation=cv2.INTER_AREA)
                 self.img = self.img.reshape((-1, 3))
             else:
@@ -88,16 +90,24 @@ class RaySamplerSingleImage(object):
 
             # load the air_light [1, 3]
             if self.a_path is not None:
-                self.air_light = np.loadtxt(self.a_path)
+                self.air_light = np.loadtxt(self.a_path).astype(np.float32)
                 self.air_light = self.air_light.reshape(1, 3)
             else:
                 self.air_light = None
+
             # load the coarse transmission map [H, W]
             if self.t_path is not None:
-                self.coarse_t = imageio.imread(self.t_path).astype(np.float64) / 255.
+                self.coarse_t = imageio.imread(self.t_path).astype(np.float32) / 255.
                 self.coarse_t = self.coarse_t.reshape(-1)  # [H*W]
             else:
                 self.coarse_t = None
+
+            # load the ground truth depth map [H, W]
+            if self.d_path is not None:
+                self.gt_depth = np.load(self.d_path).astype(np.float32) / 1000.
+                self.gt_depth = self.gt_depth.reshape(-1)
+            else:
+                self.gt_depth = None
 
             if self.mask_path is not None:
                 self.mask = imageio.imread(self.mask_path).astype(np.float32) / 255.
@@ -152,9 +162,9 @@ class RaySamplerSingleImage(object):
         for idx in selected_pixels:
             i, j = idx2sub(self.H, self.W, idx)
             H_min = max(0, i - win_rad)
-            H_max = min(self.H, i + win_rad)
+            H_max = min(self.H - 1, i + win_rad)
             W_min = max(0, j - win_rad)
-            W_max = min(self.W, j + win_rad)
+            W_max = min(self.W - 1, j + win_rad)
 
             win_inds = ind_mat[H_min: H_max + 1, W_min: W_max + 1]
             win_inds = win_inds.reshape(-1)
@@ -168,6 +178,7 @@ class RaySamplerSingleImage(object):
         rays_d = self.rays_d[selected_patch_indices, :]
         depth = self.depth[selected_patch_indices]
         coarse_t = self.coarse_t[selected_patch_indices]
+        gt_depth = self.gt_depth[selected_patch_indices]
         if self.img is not None:
             rgb = self.img[selected_patch_indices, :]
         else:
@@ -182,11 +193,13 @@ class RaySamplerSingleImage(object):
             ('ray_d', rays_d),
             ('depth', depth),
             ('rgb', rgb),
-            ('coarse_t', coarse_t),
             ('min_depth', min_depth),
             ('img_name', self.img_path),
-            ('num_pixel_in_patches', num_pixel_in_patches)
+            ('coarse_t', coarse_t),
+            ('num_pixel_in_patches', num_pixel_in_patches),
+            ('gt_depth', gt_depth)
         ])
+
         # return torch tensors
         for k in ret:
             if isinstance(ret[k], np.ndarray):
@@ -206,7 +219,8 @@ class RaySamplerSingleImage(object):
             ('depth', self.depth),
             ('rgb', self.img),
             ('mask', self.mask),
-            ('min_depth', min_depth)
+            ('min_depth', min_depth),
+            ('gt_depth', self.gt_depth)
         ])
         # return torch tensors
         for k in ret:
@@ -221,18 +235,21 @@ if __name__ == "__main__":
                            [0.0, 0.0, 1.0, 0.0],
                            [0.0, 0.0, 0.0, 1.0]], dtype=np.float32)
 
-    pose = np.array([[-7.5747752e-01,  1.6614874e-01, -6.3136548e-01,  3.7920189e-01],
-                     [ 6.5286124e-01,  1.9277288e-01, -7.3253727e-01,  4.3174285e-01],
-                     [ 7.4505806e-09, -9.6707457e-01, -2.5449321e-01,  1.5000001e-01],
+    pose = np.array([[-7.5747770e-01,  2.1615420e-01, -6.1603969e-01,  3.7920150e-01],
+                     [ 6.5286100e-01,  2.5079149e-01, -7.1475595e-01,  4.3174592e-01],
+                     [ 1.1102230e-16, -9.4360000e-01, -3.3108762e-01,  2.0000000e-01],
                      [ 0.0000000e+00,  0.0000000e+00,  0.0000000e+00,  1.0000000e+00]], dtype=np.float32)
 
     img_files = './data/carla_data/hazy/9actors/r_00147.png'
     t_files = f"/home/dennis/nerfplusplus/data/carla_data/hazy/9actors_trans/t_00147.png"
     a_files = f"/home/dennis/nerfplusplus/data/carla_data/hazy/9actors_trans/a_00147.txt"
+    d_files = f"/home/dennis/nerfplusplus/data/carla_data/hazy/9actors_depth_npy/d_00147.npy"
+
     raysampler = RaySamplerSingleImage(H=H, W=W, intrinsics=intrinsics, c2w=pose,
                           img_path=img_files,
                           a_path=a_files,
                           t_path=t_files,
+                          d_path=d_files,
                           mask_path=None,
                           min_depth_path=None,
                           max_depth=None)
