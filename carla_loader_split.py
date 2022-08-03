@@ -66,6 +66,16 @@ def load_data_split(basedir, scene, split, skip=1, try_load_min_depth=True, only
     else:
         t_files = [None, ] * cam_cnt
 
+    d_files = find_files(
+        os.path.join(basedir, scene + '_depth_npy'),
+        exts=['*.npy']
+    )
+    if len(d_files) > 0:
+        d_files = d_files[::skip]
+        assert (len(d_files) == cam_cnt)
+    else:
+        d_files = [None, ] * cam_cnt
+
     mask_files = [None, ] * cam_cnt
     mindepth_files = [None, ] * cam_cnt
 
@@ -92,6 +102,7 @@ def load_data_split(basedir, scene, split, skip=1, try_load_min_depth=True, only
         img_files = [img_files[i] for i in train_idx]
         a_files = [a_files[i] for i in train_idx]
         t_files = [t_files[i] for i in train_idx]
+        d_files = [d_files[i] for i in train_idx]
         mask_files = [mask_files[i] for i in train_idx]
         mindepth_files = [mindepth_files[i] for i in train_idx]
         pose_files = pose_files[train_idx]
@@ -100,6 +111,7 @@ def load_data_split(basedir, scene, split, skip=1, try_load_min_depth=True, only
         img_files = [img_files[i] for i in validate_idx]
         a_files = [a_files[i] for i in validate_idx]
         t_files = [t_files[i] for i in validate_idx]
+        d_files = [d_files[i] for i in validate_idx]
         mask_files = [mask_files[i] for i in validate_idx]
         mindepth_files = [mindepth_files[i] for i in validate_idx]
         pose_files = pose_files[validate_idx]
@@ -108,6 +120,7 @@ def load_data_split(basedir, scene, split, skip=1, try_load_min_depth=True, only
         img_files = [img_files[i] for i in test_idx]
         a_files = [a_files[i] for i in test_idx]
         t_files = [t_files[i] for i in test_idx]
+        d_files = [d_files[i] for i in test_idx]
         mask_files = [mask_files[i] for i in test_idx]
         mindepth_files = [mindepth_files[i] for i in test_idx]
         pose_files = pose_files[test_idx]
@@ -121,6 +134,7 @@ def load_data_split(basedir, scene, split, skip=1, try_load_min_depth=True, only
     print(f"Number of img files : {len(img_files)}")
     print(f"Number of coarse_t files : {len(t_files)}")
     print(f"Number of air_light files : {len(a_files)}")
+    print(f"Number of depth files : {len(d_files)}")
     print(f"Number of pose files : {pose_files.shape}")
     print(f"Image size : {H} * {W}")
     print(f"Preprocess facter : {scale_factor}")
