@@ -71,26 +71,6 @@ class RaySamplerSingleImage(object):
         self.resolution_level = -1
         self.set_resolution_level(resolution_level)
 
-        # # window size of the image patch using in dcp
-        # self.win_size = 15
-        # self.omega = 0.95
-        # # dark_channel image of the input hazy image. [H, W]
-        # self.dark_channel = get_dark_channel(self.img.reshape(H, W, -1), self.win_size)
-        # # air_light. [1, 3]
-        # self.air_light = get_atmosphere(self.img.reshape(H, W, -1), self.dark_channel)
-        # # coarse transmission map. [H, W]
-        # self.coarse_t = get_transmission_estimate(self.img.reshape(H, W, -1),
-        #                                           self.air_light,
-        #                                           self.omega,
-        #                                           self.win_size)
-        # self.coarse_t = self.coarse_t.reshape(-1)   # [H*W]
-
-        # self.img [H*W, 3]
-        # self.coarse_t [H*W]
-        # self.rays_o [H*W, 3]
-        # self.rays_d [H*W, 3]
-        # self.depth [H*W]
-
     def set_resolution_level(self, resolution_level):
         if resolution_level != self.resolution_level:
             self.resolution_level = resolution_level
@@ -100,7 +80,7 @@ class RaySamplerSingleImage(object):
             self.intrinsics[:2, :3] /= resolution_level
             # only load image at this time
             if self.img_path is not None:
-                self.img = imageio.imread(self.img_path).astype(np.float64) / 255.
+                self.img = imageio.imread(self.img_path).astype(np.float32) / 255.
                 self.img = cv2.resize(self.img, (self.W, self.H), interpolation=cv2.INTER_AREA)
                 self.img = self.img.reshape((-1, 3))
             else:
@@ -108,13 +88,13 @@ class RaySamplerSingleImage(object):
 
             # load the air_light [1, 3]
             if self.a_path is not None:
-                self.air_light = np.loadtxt(self.a_path)
+                self.air_light = np.loadtxt(self.a_path).astype(np.float32)
                 self.air_light = self.air_light.reshape(1, 3)
             else:
                 self.air_light = None
             # load the coarse transmission map [H, W]
             if self.t_path is not None:
-                self.coarse_t = imageio.imread(self.t_path).astype(np.float64) / 255.
+                self.coarse_t = imageio.imread(self.t_path).astype(np.float32) / 255.
                 self.coarse_t = self.coarse_t.reshape(-1)  # [H*W]
             else:
                 self.coarse_t = None
@@ -172,9 +152,9 @@ class RaySamplerSingleImage(object):
         for idx in selected_pixels:
             i, j = idx2sub(self.H, self.W, idx)
             H_min = max(0, i - win_rad)
-            H_max = min(self.H, i + win_rad)
+            H_max = min(self.H - 1, i + win_rad)
             W_min = max(0, j - win_rad)
-            W_max = min(self.W, j + win_rad)
+            W_max = min(self.W - 1, j + win_rad)
 
             win_inds = ind_mat[H_min: H_max + 1, W_min: W_max + 1]
             win_inds = win_inds.reshape(-1)
@@ -318,24 +298,3 @@ if __name__ == "__main__":
                           max_depth=None)
     ret = raysampler.random_sample(512)
 
-    # Lambda = 0.0001
-    # img = raysampler.img.reshape(H, W, -1)
-    # print(raysampler.air_light)
-    # print(raysampler.air_light.shape)
-    # L = get_laplacian(img)
-    # A = L + Lambda * scipy.sparse.eye(H * W)
-    # b = Lambda * raysampler.coarse_t.reshape(H, W).T.reshape(-1)
-    # x = scipy.sparse.linalg.spsolve(A, b)
-    # transmission = x.reshape((W, H)).T
-    # radiance = get_radiance(img, transmission, raysampler.air_light)
-    #
-    #
-    # plt.figure()
-    # plt.imshow(img)
-    # plt.figure()
-    # plt.imshow(gray2rgb(raysampler.coarse_t.reshape(H, W)))
-    # plt.figure()
-    # plt.imshow(gray2rgb(transmission))
-    # plt.figure()
-    # plt.imshow(radiance)
-    # plt.show()
