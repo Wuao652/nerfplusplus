@@ -23,7 +23,7 @@ gt_img_files = find_files(
     gt_path,
     exts=['*.png', '*.jpg'])
 
-dehazed_img_path = '/home/dennis/image_dehaze/results/9actors/radiance'
+dehazed_img_path = '/home/dennis/nerfplusplus/logs/dehaze_inv_model/render_test_250000/rgb_clear'
 dehazed_img_files = find_files(
     dehazed_img_path,
     exts=['*.png', '*.jpg'])
@@ -31,6 +31,8 @@ dehazed_img_files = find_files(
 img_cnt = len(dehazed_img_files)
 psnr_all = np.zeros(img_cnt)
 ssim_all = np.zeros(img_cnt)
+idx = 0
+
 for dehazed_img_file in dehazed_img_files:
     dehazed_img_base = os.path.basename(dehazed_img_file)
     for gt_img_file in gt_img_files:
@@ -41,9 +43,10 @@ for dehazed_img_file in dehazed_img_files:
             assert (dehazed_img.shape == gt_img.shape)
             psnr = peak_signal_noise_ratio(gt_img, dehazed_img)
             ssim = structural_similarity(gt_img, dehazed_img, multichannel=True)
-            idx = int(dehazed_img_base[-9:-4])
+            # idx = int(dehazed_img_base[-9:-4])
             psnr_all[idx] = psnr
             ssim_all[idx] = ssim
+            idx = idx + 1
             print('psnr: ', psnr)
             print('ssim: ', ssim)
 print('The overall PSNR is ', psnr_all.mean())
