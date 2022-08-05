@@ -15,7 +15,7 @@ from utils import mse2psnr, colorize_np, to8b
 import imageio
 from ddp_train_nerf import config_parser, setup_logger, setup, cleanup, render_single_image, create_nerf
 import logging
-from dcp_utils import gray2rgb, get_radiance
+# from dcp_utils import gray2rgb, get_radiance
 
 logger = logging.getLogger(__package__)
 
@@ -47,6 +47,10 @@ def ddp_test_nerf(rank, args):
                                'render_{}_{:06d}'.format(split, start))
         if rank == 0:
             os.makedirs(out_dir, exist_ok=True)
+            os.makedirs(os.path.join(out_dir, 'rgb'), exist_ok=True)         # hazy_img folder
+            os.makedirs(os.path.join(out_dir, 'rgb_clear'), exist_ok=True)   # clear_img folder
+            os.makedirs(os.path.join(out_dir, 'depth'), exist_ok=True)       # depth map folder
+            os.makedirs(os.path.join(out_dir, 't'), exist_ok=True)           # transmission map folder
         print(split)
         ###### load data and create ray samplers; each process should do this
         ray_samplers = load_data_split(args.datadir, args.scene, split, try_load_min_depth=args.load_min_depth)
@@ -75,22 +79,24 @@ def ddp_test_nerf(rank, args):
                     logger.info('{}: psnr={}'.format(fname, psnr))
 
                 im = to8b(im)
-                imageio.imwrite(os.path.join(out_dir, fname), im)
+                imageio.imwrite(os.path.join(out_dir, 'rgb', fname), im)
 
-                trans_map = ret[-1]['trans_map'].numpy()
-                clear_im = get_radiance(ray_samplers[idx].get_img(), trans_map, ray_samplers[idx].get_air_light())
-                trans_map = gray2rgb(trans_map)
-                trans_map = to8b(trans_map)
-                imageio.imwrite(os.path.join(out_dir, 'trans_' + fname), trans_map)
-
-                clear_im = to8b(clear_im)
-                imageio.imwrite(os.path.join(out_dir, 'clear_' + fname), clear_im)
+                # rgb_clear img
+                im = ret[-1]['rgb_clear'].numpy()
+                im = to8b(im)
+                imageio.imwrite(os.path.join(out_dir, 'rgb_clear', fname), im)
 
                 # depth_map
-                depth = ret[-1]['full_depth'].numpy()
-                depth = gray2rgb(depth)
-                depth = to8b(depth)
-                imageio.imwrite(os.path.join(out_dir, 'full_depth_' + fname), depth)
+                im = ret[-1]['depth'].numpy()
+                im = colorize_np(im, cmap_name='jet', append_cbar=False)[0]
+                im = to8b(im)
+                imageio.imwrite(os.path.join(out_dir, 'depth', fname), im)
+
+                # transmission_map
+                im = ret[-1]['t'].numpy()
+                im = np.tile(im[:, :, np.newaxis], (1, 1, 3))
+                im = to8b(im)
+                imageio.imwrite(os.path.join(out_dir, 't', fname), im)
 
                 # im = ret[-1]['fg_rgb'].numpy()
                 # im = to8b(im)
