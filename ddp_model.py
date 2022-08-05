@@ -76,17 +76,17 @@ class NerfNet(nn.Module):
         #### use 2 beta parameters ####
         ###############################
         self.fg_beta = nn.Parameter(
-            torch.rand(1)
+            torch.randn(1)
         )
         self.bg_beta = nn.Parameter(
-            torch.rand(1)
+            torch.randn(1)
         )
 
         self.fg_airlight = nn.Parameter(
-            torch.rand(3)
+            torch.randn(3)
         )
         self.bg_airlight = nn.Parameter(
-            torch.rand(3)
+            torch.randn(3)
         )
 
     def forward(self, ray_o, ray_d, fg_z_max, fg_z_vals, bg_z_vals):
