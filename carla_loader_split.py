@@ -48,7 +48,7 @@ def load_data_split(basedir, scene, split, skip=1, try_load_min_depth=True, only
 
     # clear img files
     img_clear_files = find_files(
-        os.path.join(basedir.replace('hazy', 'gt'), scene),
+        os.path.join(basedir.replace('hazy', 'gt'), scene + '_dcp'),
         exts=['*.png', '*.jpg'])
     if len(img_clear_files) > 0:
         # print(f"load {len(img_clear_files)} image files")
