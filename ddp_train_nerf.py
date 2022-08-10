@@ -17,7 +17,7 @@ import logging
 import json
 
 from utils import gray2rgb
-
+from geomloss import SamplesLoss
 logger = logging.getLogger(__package__)
 
 
@@ -524,7 +524,9 @@ def ddp_train_nerf(rank, args):
                 # use a different loss here
                 # ==========================
                 rgb_loss = img2mse(ret['rgb'], rgb_gt)
-                rgb_clear_loss = img2mse(ret['rgb_clear'], rgb_clear_gt)
+                # rgb_clear_loss = img2mse(ret['rgb_clear'], rgb_clear_gt)
+                sinkhorn_loss = SamplesLoss('sinkhorn', blur=0.01, backend='auto')
+                rgb_clear_loss = sinkhorn_loss(ret['rgb_clear'], rgb_clear_gt)
                 loss = rgb_loss + rgb_clear_loss
 
             scalars_to_log['level_{}/rgb_loss'.format(m)] = rgb_loss.item()
